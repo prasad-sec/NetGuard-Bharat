@@ -68,7 +68,7 @@ Because the Python script sniffs raw network packets in promiscuous mode, **you 
 1. Open PowerShell or Command Prompt as **Administrator**.
 2. Navigate to the backend folder:
    ```cmd
-   cd "C:\Users\PRASAD DABHEKAR\OneDrive\Documents\NetGuardBharat\backend"
+   cd backend
    ```
 3. Start the tap:
    ```cmd
