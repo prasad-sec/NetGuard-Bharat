@@ -1,95 +1,91 @@
 # NetGuard Bharat
 
-NetGuard Bharat is an enterprise-grade, real-time data exfiltration visualizer and Zero-Trust network monitoring dashboard. It intercepts outbound socket connections, performs deep packet inspection via behavioral heuristics, and maps telemetry data dynamically onto an interactive 3D globe. 
+NetGuard Bharat is a real-time network monitoring dashboard and data exfiltration visualizer. It monitors outbound socket connections, runs a passive packet-sniffing tap in the background, and maps network traffic dynamically onto an interactive 3D globe. 
 
-## 🚀 Features Implemented
-From inception to the current production-ready state, the following systems have been built:
+The project is built to help identify anomalous outbound traffic, track where local processes are sending data, and provide threat mitigation guides.
 
-### 1. 3D Cyber Globe (Frontend)
-- Built with React, Vite, and Three.js.
-- Real-time mapping of outbound traffic: Extrapolates destination IPs to geographical coordinates and draws glowing telemetry arcs from India to the target server.
-- Automatically caches and caps rendered arcs (max 30) for high performance without crashing the browser.
+---
 
-### 2. High-Speed Telemetry Ingestion (Backend Proxy Server)
-- Node.js backend executing native `netstat` and `tasklist` commands continuously.
-- Implements a 5-second Process Caching loop to map PIDs to AppNames instantly.
-- Live socket streaming via `Socket.IO` to push structured telemetry events straight to the dashboard.
-- Includes an HTTP endpoint `/api/alert` to accept deep-packet inspection anomalies from external AI modules.
+## Key Features
 
-### 3. Enterprise UI/UX (Glassmorphism & Tricolour Aesthetic)
-- Complete UI overhaul replacing basic layouts with a premium, responsive Dashboard.
-- **Tricolour Title:** The "NetGuard Bharat" header features an animated, high-specificity Indian tricolour CSS gradient (Saffron, White, Green).
-- **Engine Status Block:** Clean, dynamic "ZERO-TRUST ENFORCED" indicator that flashes red/yellow/green based on active protection state, alongside dynamic telemetry grid displaying authentic roundtrip WebSocket latency.
-- **Intelligence Filters:** Dedicated left-panel toggles for Stealth Mode (hides safe traffic), Noise Mode (shows raw OS chatter), and Geofencing (flags non-Indian traffic as threats).
-- **AI Copilot:** Summarized threat/safe metrics box.
-- **Live HUD Stats & WebSocket Ping:** Wired "Total Leaks Detected" to a cumulative `lifetimeLeaks` state and "Active Connections" to an independent cumulative `lifetimeConnections` state (both incrementing indefinitely and fully resetting to `0` via the Sweep Logs controls). Implemented an authentic roundtrip WebSocket latency ping interval (firing every 3 seconds) with local network clamp `Math.max(1, timeDiff)` for accurate live telemetry measurement. Includes a Left Panel CSV exporter trigger for raw threat history downloads.
+### 1. Interactive 3D Globe
+*   Built with React, Vite, and Three.js.
+*   Plots active outbound connections as glowing lines connecting India to target countries based on their destination IPs.
+*   Includes automatic performance capping (rendering a maximum of 30 active arcs at a time) to avoid browser lag.
 
-### 4. Interactive Threat Intelligence Feed & Logs
-- **Intelligence Feed:** Accordion-style expandable list showing the 10 most recent network events. Clicking an event reveals exact Timestamp, AppName, Payload Estimates, and Severity.
-- **Raw Terminal Logs:** A dedicated FIFO scrolling terminal log (capped at 100 items) representing pure backend JSON telemetry lines. Color-coded: Red (`[THREAT]`), Cyan (`[SAFE]`), Yellow (`[NOISE]`). Fully synchronized with the backend memory buffer and clearable via the "Sweep" control.
-- **Mitigation Action Modal:** Clicking "Take Action" on a threat brings up a professional "Mitigation Guide" modal with ELI5 remediation steps (Disable via Task Manager, Revoke Privacy, Block IP in Firewall).
+### 2. Network Sniffer & Process Mapper (Express Backend)
+*   A lightweight Node.js server that polls current socket connections using native OS tools (`netstat` and `tasklist`).
+*   Maps active connection PIDs to executable application names, using a 5-second process name cache to minimize CPU usage.
+*   Streams socket data in real time via Socket.IO to the client dashboard.
+*   Exposes an `/api/alert` POST route to receive and display behavioral flags from external network taps.
 
-### 5. Enterprise Threat Report (PDF Generation)
-- Cleaned up the old CSV exporter and replaced it with a professional `jsPDF` + `autoTable` generator.
-- Extracts current Raw Logs to produce an encrypted-looking `NetGuard_Threat_Report_YYYY-MM-DD.pdf`.
-- Features dark-mode headers, conditional red highlighting for rows marked as THREATs, and an Indian tricolour accent stripe at the top and bottom of each page.
+### 3. Dashboard UI & Filters
+*   **Indian Tricolour Header**: Designed with a glowing gradient matching the Indian flag.
+*   **System Status HUD**: Displays active protection status, real roundtrip WebSocket latency, and cumulative connection/leak counters.
+*   **Traffic Filters**: Left-panel buttons to toggle Stealth Mode (hides safe/known traffic), Noise Mode (shows internal OS chatter), and Geofencing (highlights non-Indian traffic as alerts).
+*   **Silence Alerts Toggle**: A bell button (`🔔`/`🔕`) in the header next to the title. When clicked, it silences all audio sirens, red visual pulses, and pop-up toast alerts, while still feeding the real-time logs and statistics in the background.
 
-### 6. Deep Packet AI (Python Enterprise Tap)
-- `enterprise_tap.py`: A `scapy`-powered network sniffer that actively captures raw packets, extracting protocol, source, destination, and payload size. Runs in promiscuous mode (requires Administrator privileges).
-- `behavioral_engine.py`: Tails the `network_baseline.log` file generated by the Tap. It looks for anomalies (e.g., payloads > 1000 bytes leaving the local network) and fires POST requests directly to the Node.js proxy server to trigger a `CRITICAL` alert on the frontend.
-- Smart auto-detection of the active Windows network interface.
+### 4. Interactive Logs & Mitigation Guides
+*   **Intel Feed**: An accordion-based list of the 10 most recent threat alerts. Click any card to see payload sizes, process names, and timestamps.
+*   **Live JSON Terminal**: A terminal-style scrolling console that displays raw connection packets color-coded by severity (red for threats, cyan for safe, yellow for noise).
+*   **Take Action Panel**: A quick-mitigation pop-up that guides you through closing malicious processes, blocking outbound IPs via firewall rules, and revoking privacy permissions.
 
-### 7. Interactive AI Copilot & Hybrid UI
-- **Log-Aware Reasoning**: Connected backend to a local Ollama instance running `llama3.2:1b` to act as an expert cybersecurity assistant.
-- **Express AI Bridge**: Exposes a strict POST route at `/api/copilot` in `server.js` feeding Ollama a rich context of the 15 most recent network activities to provide informed recommendations.
-- **Interactive Chat Interface**: Designed a scrollable, real-time message stream tab in the Right Panel styled matching the premium dashboard cyber-theme, featuring auto-scrolling and live state transitions.
+### 5. PDF Threat Report Exporter
+*   Generates clean, professional PDF reports on-demand using `jsPDF` and `jspdf-autotable`.
+*   Includes dark-styled tables, automated tricolour accent margins, and distinct rows highlighting active threats.
 
-### 8. Zero-Trust CORS Security & Header Mute Switch
-- **Strict CORS Lockdown**: Configured Express proxy server to use a strict `corsOptions` object that permanently locks origin access explicitly to `http://localhost:5173`.
-- **Header Mute Switch**: Placed an elegant, subtle clickable bell (`🔔` / `🔕`) button in the main Header next to the "NETGUARD BHARAT" title. Removes any sidebar flexbox clutter, keeping the Left Panel beautifully aligned.
-- **Closure-Safe Muting**: Uses a synchronized React state & `useRef` to safely bypass socket closure constraints, instantly silencing audio alarms, toast notifications, and full-screen threat pulses while preserving backend logging and dashboard database ingestion.
+### 6. Deep Packet Inspection (Python Scapy Tap)
+*   `enterprise_tap.py`: A Python script using `scapy` to capture raw network packets in promiscuous mode (requires Administrator rights).
+*   `behavioral_engine.py`: Scans the packet log file for anomalies (like payloads greater than 1000 bytes leaving the local network) and alerts the Node.js backend.
+*   Detects the active network interface automatically on launch.
 
-## 🛠️ How to Run the Stack
+### 7. AI Copilot (Ollama Integration)
+*   **Local LLM Integration**: Uses a local Ollama instance running `llama3.2:1b` to act as an offline cybersecurity analyst.
+*   **Express AI Bridge**: Has a `/api/copilot` POST route that feeds the 15 most recent network events as context to the model.
+*   **Smart Greeting Directive**: Automatically catches simple greetings (like "hi" or "hello") to reply with a friendly, professional intro instead of dumping or analyzing the logs unnecessarily.
 
-### 1. Dashboard & Proxy Server (Node/React)
-Open two standard terminals:
+---
+
+## Getting Started
+
+### 1. Run the Dashboard & Express Backend
+You need two terminals:
 ```bash
-# Terminal 1: Start the Backend Proxy
+# Terminal 1: Run the backend
 cd proxy-server
 node server.js
 ```
+
 ```bash
-# Terminal 2: Start the Frontend UI
+# Terminal 2: Run the React app
 cd frontend
 npm run dev
 ```
-Access the dashboard at `http://localhost:5173`.
+Open `http://localhost:5173` in your browser.
 
-### 2. Deep Packet AI Engine (Python Enterprise Tap)
-Because the Python tap uses `scapy` to intercept low-level network packets promiscuously, it **must be run as an Administrator**.
-
-1. Click **Start** (Windows Logo), type `PowerShell` or `Command Prompt`.
-2. Right-click the application and select **Run as Administrator**.
-3. Navigate to the backend directory:
+### 2. Run the Packet Sniffer (Python)
+Because the Python script sniffs raw network packets in promiscuous mode, **you must run it with Administrator privileges**:
+1. Open PowerShell or Command Prompt as **Administrator**.
+2. Navigate to the backend folder:
    ```cmd
    cd "C:\Users\PRASAD DABHEKAR\OneDrive\Documents\NetGuardBharat\backend"
    ```
-4. Run the enterprise tap:
+3. Start the tap:
    ```cmd
    python enterprise_tap.py
    ```
-5. (Optional) In another terminal, run the behavioral engine to start sending AI flags to the dashboard:
+4. (Optional) Run the analyzer engine in another terminal to forward alerts to the dashboard:
    ```cmd
    python behavioral_engine.py
    ```
 
-### 3. Local AI Copilot (Ollama Setup)
-To enable the AI Copilot on the dashboard:
-1. Download and install **[Ollama](https://ollama.com/)** on your system.
-2. In your terminal, download and run the `llama3.2:1b` model:
+### 3. Local AI Copilot Setup
+To enable the offline AI chatbot:
+1. Install **[Ollama](https://ollama.com/)** on your system.
+2. In your terminal, download and start the model:
    ```bash
    ollama run llama3.2:1b
    ```
-3. Once running, the server's `/api/copilot` bridge endpoint will automatically communicate with it at `http://localhost:11434`.
+3. Once the model is active, the dashboard will automatically connect and route chats through `http://localhost:11434`.
 
-*Note: The frontend dashboard will run perfectly fine using just `server.js` (which uses netstat polling), but running the Python Tap unlocks deep payload sizing and AI behavioral alerts.*
+*Note: The frontend dashboard will run fine with just the Node backend (`server.js` using netstat polling). The Python Scapy Tap and Ollama are optional add-ons to unlock deeper packet metrics and interactive chats.*
