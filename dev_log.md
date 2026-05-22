@@ -1,10 +1,10 @@
-# NetGuard Bharat - Project Dev Log
+# 🛡️ NetGuard Bharat - Project Dev Log
 
 This dev log tracks our system implementation steps, key technical decisions, refactors, and optimization details from the ground up.
 
 ---
 
-## Technical Architecture Overview
+## ⚙️ Technical Architecture Overview
 The system consists of three main components:
 1.  **Frontend Dashboard**: A React application built with Vite, utilizing Socket.IO-client, Tailwind CSS, Three.js (for the 3D Globe), and jsPDF (for threat reports).
 2.  **Express Proxy Server**: A Node.js backend executing native system commands (`netstat`, `tasklist`) to passively collect active sockets, process PIDs, and application executable names, streaming them in real time to the frontend.
@@ -12,25 +12,25 @@ The system consists of three main components:
 
 ---
 
-## Chronological Progress & Sprint Details
+## 📅 Chronological Progress & Sprint Details
 
-### Phase 1: Core Setup & Sockets Pipeline
+### 🚀 Phase 1: Core Setup & Sockets Pipeline
 *   Bootstrapped the React client using Vite for rapid hot reload.
 *   Setup the Express proxy server (`proxy-server/server.js`) to poll current network connections. To avoid massive CPU overhead under active traffic, we implemented a **5-second caching mechanism** that polls `tasklist /FO CSV` at intervals and uses this cache to map active socket PIDs to executable names.
 *   Wrote the raw Python sniffer (`enterprise_tap.py`) with Scapy and the behavioral engine (`behavioral_engine.py`) to tail baseline network logs, watch for outbound payloads larger than 1000 bytes, and trigger critical threats via an Express API endpoint `/api/alert`.
 
-### Phase 2: WebGL 3D Globe
+### 🌍 Phase 2: WebGL 3D Globe
 *   Built `GlobeMap.jsx` using Three.js to render a stylized 3D earth.
 *   Plotted coordinates of active outbound connections leaving India and drawn glowing bezier curves to target endpoints.
 *   *Performance Safeguard*: Capped the maximum rendering to 30 active curves at a time to prevent WebGL browser tabs from lagging or crashing.
 
-### Phase 3: Cockpit Interface & Live Filters
+### 🎨 Phase 3: Cockpit Interface & Live Filters
 *   Integrated a slate dark-mode look using modern typography (`Share Tech Mono`) and blur backdrop glassmorphic boxes.
 *   Added live filters: Stealth Mode (hides whitelisted applications), Noise Mode (exposes internal background OS calls), and Geofencing (flags all non-Indian connections as threats).
 *   Added an interactive collapsible alert panel (collapsible accordion list of the 10 most recent threat alerts) displaying raw socket info, and a scrolling live JSON console showing raw network packets.
 *   Added a quick mitigation modal that gives step-by-step instructions on firewalls, task manager, and revoking permissions.
 
-### Phase 4: Tricolour Exporter & Real pings
+### 📡 Phase 4: Tricolour Exporter & Real Pings
 *   Swapped Native alerts with standard `react-hot-toast` notifications. Built a custom, manual dismiss button `toast.dismiss()` with resilient string fallbacks.
 *   Built a professional PDF exporter using `jsPDF` and `jspdf-autotable`. Added Indian tricolour styling bars on top and bottom of each exported page, conditional row highlighting for active threats, and confindentail metadata labels.
 *   Cleaned React reconciliation warning keys by building compound, unique bulletproof key strings for lists.
@@ -38,17 +38,17 @@ The system consists of three main components:
 *   Wired the left-panel stats to cumulative connection/alert states that track lifetime sessions indefinitely and fully reset on clicking `Sweep`.
 *   Replaced mock heartbeat loops with an authentic roundtrip WebSocket latency ping interval (firing every 3 seconds) with local network clamp `Math.max(1, timeDiff)` for accurate network state display.
 
-### Phase 5: Git Cleanup & Association
+### 🧹 Phase 5: Git Cleanup & Association
 *   Added a root `.gitignore` ignoring common environment artifacts (`node_modules/`, `__pycache__/`, `.vscode/`, `.DS_Store`).
 *   Untracked previously cached system files in Git cache, reducing source staging to 20 lightweight, structured files.
 *   Configured remote origin association pointing to `https://github.com/prasad-sec/NetGuard-Bharat.git` and pushed main to remote.
 
-### Phase 6: Local AI Copilot Integration (Ollama)
+### 🤖 Phase 6: Local AI Copilot Integration (Ollama)
 *   Created `/api/copilot` Express POST bridge to integrate local Ollama instance running the `llama3.2:1b` model.
 *   Compiled a prompt context feeding the model the 15 most recent network activity logs. Added robust status check and elegant error handling fallback messages in case the local Ollama instance is offline.
 *   Built an interactive, scrollable chat panel in the right sidebar featuring auto-scroll to bottom.
 
-### Phase 7: Strict CORS & Alerts Muter Refactor
+### 🔒 Phase 7: Strict CORS & Alerts Muter Refactor
 *   Hardlocked backend CORS security by defining a strict `corsOptions` object explicitly limiting request origin to our Vite frontend (`http://localhost:5173`) and allowing only `GET` and `POST` methods.
 *   Resolved React closure bugs inside the Socket `useEffect` event loop by implementing a synchronized `isMuted` state and `muteRef`.
 *   Placed a subtle, clickable bell button (`🔔`/`🔕`) next to the "NETGUARD BHARAT" main title in the header, keeping the left controls panel flexbox aligned and clean.
