@@ -3,10 +3,17 @@ const geoip = require('geoip-lite');
 const { Server } = require('socket.io');
 const express = require('express');
 const http = require('http');
+const cors = require('cors');
 
 const SOCKET_PORT = 3002;
 
 const app = express();
+const corsOptions = {
+  origin: 'http://localhost:5173',
+  methods: ['GET', 'POST'],
+  allowedHeaders: ['Content-Type']
+};
+app.use(cors(corsOptions));
 app.use(express.json()); // Parse JSON bodies
 
 const server = http.createServer(app);
@@ -62,6 +69,60 @@ app.post('/api/alert', (req, res) => {
   console.log(`\n[🚨 AI THREAT DETECTED] Deep Packet AI flagged anomaly to ${remoteIp} (${country})`);
   
   res.status(200).send({ success: true, message: "Alert processed and broadcasted." });
+});
+
+// --- AI COPILOT ENDPOINT ---
+app.post('/api/copilot', async (req, res) => {
+  try {
+    const { userQuery } = req.body || {};
+    
+    // Gather up to the 15 most recent logs
+    const recentLogs = logHistory.slice(-15);
+    const logsContext = recentLogs.map((log, idx) => {
+      return `[${idx + 1}] Timestamp: ${log.timestamp}, App: ${log.appName || 'Unknown'}, Target: ${log.dataType || 'Unknown'}, Country: ${log.country || 'Unknown'}, Severity: ${log.severity || 'Unknown'}, Threat: ${log.isThreat ? 'Yes' : 'No'}${log.message ? `, Message: ${log.message}` : ''}`;
+    }).join('\n');
+
+    // Construct prompt
+    let prompt = `You are NetGuard Copilot, an expert cybersecurity analyst.
+Analyze the provided network logs. Identify any anomalies, large data payloads, or suspicious IPs. Be concise, professional, and do not use markdown formatting.
+
+CRITICAL DIRECTIVES:
+1. If the user's query is a simple greeting (such as "hi", "hello", "hey", "greetings"), you MUST simply greet the user back professionally, acknowledge your role as NetGuard Copilot, and ask how you can assist them today.
+2. If the user's query is a simple greeting, you MUST NOT analyze or output any of the context logs below. Completely ignore the logs in your response in this case.
+3. Only analyze the network logs and discuss telemetry or threats if the user explicitly asks a question about the system, logs, anomalies, network activity, or security threats.
+
+Recent Network Logs:
+${logsContext || 'No logs recorded yet.'}`;
+    if (userQuery) {
+      prompt += `\n\nUser Query: ${userQuery}`;
+    }
+
+    // Call Ollama API
+    const response = await fetch('http://127.0.0.1:11434/api/generate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'llama3.2:1b',
+        prompt: prompt,
+        stream: false
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Ollama responded with status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    res.status(200).json({ reply: data.response });
+  } catch (error) {
+    console.error("OLLAMA FETCH ERROR:", error.message || error);
+    console.error('Error in AI Copilot endpoint:', error);
+    res.status(500).json({ 
+      reply: 'Sorry, I encountered an error. Please make sure that the local Ollama instance is running with the llama3.2:1b model.' 
+    });
+  }
 });
 
 server.listen(SOCKET_PORT, () => {

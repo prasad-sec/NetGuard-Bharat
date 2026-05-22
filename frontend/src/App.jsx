@@ -24,6 +24,17 @@ function App() {
   const [lifetimeConnections, setLifetimeConnections] = useState(0);
   const [lifetimeLeaks, setLifetimeLeaks] = useState(0);
 
+  const [chatHistory, setChatHistory] = useState([
+    { role: 'ai', text: 'System secure. I am ready to analyze the latest network telemetry. How can I assist?' }
+  ]);
+  const [isCopilotLoading, setIsCopilotLoading] = useState(false);
+  const [copilotInput, setCopilotInput] = useState('');
+  const chatEndRef = useRef(null);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatHistory, isCopilotLoading]);
+
   useEffect(() => {
     if (!socket) return;
     const pingInterval = setInterval(() => {
@@ -59,6 +70,7 @@ function App() {
   const socketRef = useRef(null);
   const audioCtxRef = useRef(null);
   const [isMuted, setIsMuted] = useState(false);
+  const muteRef = useRef(false);
   const [audioActive, setAudioActive] = useState(false);
 
   const initAudio = async () => {
@@ -115,7 +127,7 @@ function App() {
       duration: 5000,
     });
 
-    if (isMuted) return;
+    if (muteRef.current) return;
 
     // 2. High-Frequency Siren (Louder & More Robust)
     try {
@@ -209,12 +221,14 @@ function App() {
 
       // 2. Threat Visuals & Beep
       if (event.isThreat) {
-        notifyUser(event);
+        if (!muteRef.current) {
+          notifyUser(event);
+          
+          // Red Flash Alert
+          document.body.classList.add('threat-pulse');
+          setTimeout(() => document.body.classList.remove('threat-pulse'), 1000);
+        }
         setTotalLeaked((prev) => prev + 1);
-        
-        // Red Flash Alert
-        document.body.classList.add('threat-pulse');
-        setTimeout(() => document.body.classList.remove('threat-pulse'), 1000);
       }
       
       setLeaks((prev) => {
@@ -229,6 +243,37 @@ function App() {
     };
   }, []);
 
+  const handleSendCopilotMessage = async () => {
+    if (!copilotInput.trim()) return;
+    const userText = copilotInput.trim();
+    
+    setChatHistory(prev => [...prev, { role: 'user', text: userText }]);
+    setCopilotInput('');
+    setIsCopilotLoading(true);
+
+    try {
+      const response = await fetch(`${SOCKET_SERVER_URL}/api/copilot`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ userQuery: userText })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setChatHistory(prev => [...prev, { role: 'ai', text: data.reply || 'No response received.' }]);
+    } catch (error) {
+      console.error('Copilot Chat Error:', error);
+      setChatHistory(prev => [...prev, { role: 'ai', text: '🚨 Connection to local AI engine failed. Please ensure the local Ollama instance and proxy server are active.' }]);
+    } finally {
+      setIsCopilotLoading(false);
+    }
+  };
+
   const toggleMonitoring = () => {
     const newState = !isMonitoring;
     setIsMonitoring(newState);
@@ -240,6 +285,11 @@ function App() {
   const toggleStealth = () => { setStealthMode(!stealthMode); stealthRef.current = !stealthMode; };
   const toggleNoise = () => { setShowNoise(!showNoise); noiseRef.current = !showNoise; };
   const toggleGeo = () => { setGeofenceIndia(!geofenceIndia); geoRef.current = !geofenceIndia; };
+  const toggleMuted = () => {
+    const nextVal = !isMuted;
+    setIsMuted(nextVal);
+    muteRef.current = nextVal;
+  };
 
   const clearLogs = () => {
     setLeaks([]);
@@ -400,7 +450,21 @@ function App() {
         {/* Left Side: Stats and Titles */}
         <div className="panel header-panel">
           <div>
-            <h1 className="glitch-title tricolour-title">NETGUARD BHARAT</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="glitch-title tricolour-title" style={{ margin: 0 }}>NETGUARD BHARAT</h1>
+              <button
+                onClick={toggleMuted}
+                className={`cursor-pointer flex items-center justify-center transition-all duration-200 active:scale-90 p-1.5 rounded-md ${
+                  isMuted 
+                    ? 'bg-red-950/20 border border-red-500/30 text-red-400 shadow-[0_0_8px_rgba(239,68,68,0.15)]' 
+                    : 'bg-slate-900/40 border border-slate-700/40 text-slate-400 hover:text-white hover:bg-slate-800/40'
+                }`}
+                style={{ width: '28px', height: '28px' }}
+                title={isMuted ? "Alerts Muted - Click to Unmute" : "Alerts Active - Click to Mute"}
+              >
+                {isMuted ? '🔕' : '🔔'}
+              </button>
+            </div>
             <div className="subtitle">Real-Time Data Exfiltration Visualizer</div>
           </div>
 
@@ -460,6 +524,7 @@ function App() {
             >
               ♺ SWEEP
             </button>
+
             <button 
               onClick={() => alert("Initiating backend download of full threat_history.csv...")}
               className="py-2 px-4 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded font-bold text-xs text-slate-300 transition-all active:scale-95 flex items-center justify-center gap-2"
@@ -516,57 +581,117 @@ function App() {
 
           {/* ── TAB: AI Copilot ── */}
           {activeTab === 'copilot' && (
-            <div className="tab-content">
-              <div className="copilot-header">
+            <div className="tab-content" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+              <div className="copilot-header" style={{ flexShrink: 0 }}>
                 <div className="live-indicator" style={{ background: '#a855f7' }}></div>
                 <span style={{ color: '#a855f7' }}>AI COPILOT</span>
               </div>
-              <div className="copilot-summary">
-                <div className="copilot-card">
-                  <div className="copilot-label">🔴 Active Threats</div>
-                  <div className="copilot-value" style={{ color: '#ef4444' }}>
-                    {leaks.filter(l => l.severity === 'THREAT').length}
+              
+              {/* Message Window */}
+              <div style={{
+                flex: 1,
+                overflowY: 'auto',
+                padding: '10px',
+                border: '1px solid rgba(168,85,247,0.15)',
+                borderRadius: '8px',
+                background: 'rgba(0,0,0,0.3)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px',
+                marginBottom: '10px',
+                maxHeight: 'calc(100vh - 250px)'
+              }}>
+                {chatHistory.map((msg, idx) => (
+                  <div
+                    key={idx}
+                    className="pop-in"
+                    style={{
+                      alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                      maxWidth: '85%',
+                      background: msg.role === 'user' ? 'rgba(30,41,59,0.75)' : 'rgba(168,85,247,0.08)',
+                      border: msg.role === 'user' ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(168,85,247,0.25)',
+                      borderRadius: msg.role === 'user' ? '8px 8px 0px 8px' : '8px 8px 8px 0px',
+                      padding: '8px 12px',
+                      fontSize: '0.8rem',
+                      lineHeight: '1.4',
+                      color: '#e2e8f0',
+                      boxShadow: msg.role === 'ai' ? '0 0 10px rgba(168,85,247,0.05)' : 'none'
+                    }}
+                  >
+                    <div style={{
+                      fontWeight: 'bold',
+                      fontSize: '0.65rem',
+                      color: msg.role === 'user' ? 'var(--accent-cyan)' : '#d8b4fe',
+                      marginBottom: '4px',
+                      fontFamily: 'Share Tech Mono, monospace'
+                    }}>
+                      {msg.role === 'user' ? 'ADMIN' : 'CO-PILOT'}
+                    </div>
+                    <div style={{ wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
+                      {msg.text}
+                    </div>
                   </div>
-                </div>
-                <div className="copilot-card">
-                  <div className="copilot-label">🟢 Safe Events</div>
-                  <div className="copilot-value" style={{ color: '#10b981' }}>
-                    {leaks.filter(l => l.severity === 'SAFE').length}
+                ))}
+                
+                {isCopilotLoading && (
+                  <div
+                    style={{
+                      alignSelf: 'flex-start',
+                      background: 'rgba(168,85,247,0.05)',
+                      border: '1px solid rgba(168,85,247,0.15)',
+                      borderRadius: '8px 8px 8px 0px',
+                      padding: '8px 12px',
+                      fontSize: '0.8rem',
+                      color: '#c084fc',
+                      animation: 'pulse 1.5s infinite',
+                      fontFamily: 'Share Tech Mono, monospace'
+                    }}
+                  >
+                    Analyzing telemetry...
                   </div>
-                </div>
-                <div className="copilot-card">
-                  <div className="copilot-label">⚪ Noise</div>
-                  <div className="copilot-value" style={{ color: '#94a3b8' }}>
-                    {leaks.filter(l => l.severity === 'NOISE').length}
-                  </div>
-                </div>
-              </div>
-              <div className="copilot-insight">
-                <div className="copilot-insight-title">🧠 Threat Analysis</div>
-                {leaks.filter(l => l.severity === 'THREAT').length === 0 ? (
-                  <p style={{ color: '#10b981', fontSize: '0.85rem', lineHeight: 1.5 }}>
-                    ✅ No active exfiltration events detected. System perimeter is clean.
-                  </p>
-                ) : (
-                  <>
-                    <p style={{ color: '#fca5a5', fontSize: '0.85rem', lineHeight: 1.5, marginBottom: '10px' }}>
-                      ⚠️ <strong>{leaks.filter(l => l.severity === 'THREAT').length}</strong> suspicious process(es) detected communicating with foreign servers.
-                    </p>
-                    <p style={{ color: '#94a3b8', fontSize: '0.8rem', lineHeight: 1.5 }}>
-                      Top offender: <span style={{ color: '#fca5a5', fontFamily: 'Share Tech Mono, monospace' }}>{leaks.find(l => l.severity === 'THREAT')?.appName || '—'}</span>
-                      {' → '}<span style={{ color: '#fb923c', fontFamily: 'Share Tech Mono, monospace' }}>{leaks.find(l => l.severity === 'THREAT')?.country || '—'}</span>
-                    </p>
-                  </>
                 )}
+                <div ref={chatEndRef} />
               </div>
-              <div className="copilot-insight" style={{ marginTop: '10px', borderColor: 'rgba(168,85,247,0.25)' }}>
-                <div className="copilot-insight-title" style={{ color: '#a855f7' }}>📡 Network Posture</div>
-                <p style={{ color: '#e2e8f0', fontSize: '0.82rem', lineHeight: 1.6 }}>
-                  Monitoring <strong style={{ color: '#06b6d4' }}>{activeConnections}</strong> live connections.
-                  {' '}{totalLeaked > 0
-                    ? `${totalLeaked} exfiltration event(s) logged this session — consider reviewing flagged processes.`
-                    : 'No anomalies recorded this session.'}
-                </p>
+
+              {/* Input Area */}
+              <div style={{ display: 'flex', gap: '8px', flexShrink: 0, marginTop: 'auto' }}>
+                <input
+                  type="text"
+                  placeholder="Ask Copilot about exfiltration, logs, or threats..."
+                  value={copilotInput}
+                  onChange={(e) => setCopilotInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleSendCopilotMessage();
+                    }
+                  }}
+                  disabled={isCopilotLoading}
+                  style={{
+                    flex: 1,
+                    background: 'rgba(0,0,0,0.45)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    borderRadius: '6px',
+                    color: '#fff',
+                    padding: '8px 12px',
+                    fontSize: '0.8rem',
+                    outline: 'none',
+                    fontFamily: 'Share Tech Mono, monospace'
+                  }}
+                />
+                <button
+                  onClick={handleSendCopilotMessage}
+                  disabled={isCopilotLoading || !copilotInput.trim()}
+                  className="action-btn"
+                  style={{
+                    flex: 'none',
+                    width: '70px',
+                    background: 'rgba(168,85,247,0.15)',
+                    borderColor: 'rgba(168,85,247,0.3)',
+                    color: '#d8b4fe'
+                  }}
+                >
+                  SEND
+                </button>
               </div>
             </div>
           )}

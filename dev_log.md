@@ -156,6 +156,64 @@ This file documents the chronological implementation details, design decisions, 
    - Cleanly stopped all active background developer instances: the **Express Proxy Server** (Port `3002`) and the **Vite Dev Server** (Port `5173`).
    - Verified clean process termination.
 
+### Phase 13: GitHub Remote Publish
+*Goal: Securely publish the pristine repository to GitHub.*
+
+1. **Remote Association**:
+   - Associated the local repository with the remote URL: `https://github.com/prasad-sec/NetGuard-Bharat.git`.
+2. **Push to GitHub**:
+   - Renamed default branch to `main`.
+   - Successfully pushed the optimized repository history directly to GitHub.
+
+### Phase 14: Backend Local AI Integration (Ollama Copilot)
+*Goal: Integrate a local Ollama instance running the 'llama3.2:1b' model as our AI Copilot by creating a bridge endpoint in the Express server.*
+
+1. **AI Copilot Endpoint (`/api/copilot`)**:
+   - Created a new POST route at `/api/copilot` in `server.js` that accepts a JSON body containing an optional `userQuery` string.
+2. **Context Gathering & Prompting**:
+   - Safely extracted up to the 15 most recent network telemetry items from the existing `logHistory` memory array to serve as context.
+   - Constructed a professional cybersecurity analyst persona ("You are NetGuard Copilot...") and compiled the logs dynamically, appending any custom user queries at the end.
+3. **Local Ollama Integration**:
+   - Configured native asynchronous `fetch` requests targeting the local Ollama generator at `http://localhost:11434/api/generate` with model `llama3.2:1b` and `stream: false`.
+   - Handled success paths by parsing the generated `response` text and returning `{ reply: ... }` with a 200 status code, and integrated robust error handling that returns a 500 status code with a safe fallback error message if the Ollama service is offline.
+
+### Phase 15: Frontend AI Copilot UI Integration
+*Goal: Integrate the interactive AI Copilot chat window into the right-hand panel of the dashboard.*
+
+1. **State Management**:
+   - Added `chatHistory` state initialized with a default system greeting.
+   - Added `isCopilotLoading` to display a blinking indicator when the model is processing.
+   - Added `copilotInput` to bind the text field.
+2. **Interactive UI**:
+   - Created a dynamic tab panel on the right sidebar containing an "AI Copilot" tab.
+   - Designed a scrollable chat thread matching the premium cyber-defense cockpit theme.
+   - Integrated automatic scroll-to-bottom on new messages.
+
+### Phase 16: Zero-Trust CORS Lockdown & Notification Mute Toggle
+*Goal: Enforce strict backend security policies and introduce a premium glassmorphic alert mute switch.*
+
+1. **Strict CORS (Backend)**:
+   - Replaced wildcard CORS with a strict configuration in `server.js` allowing only `http://localhost:5173` with allowed `GET` and `POST` methods and `Content-Type` headers.
+2. **Notification Mute State (`isMuted` & `muteRef`)**:
+   - Declared a boolean state `isMuted` (default false) and a matching `muteRef` to feed changes dynamically to the high-frequency Socket.io event loop bypassing closures.
+3. **Glassmorphic Toggle Button**:
+   - Added a "Mute Toggle" button in the Left Panel controls.
+   - Styled using custom cyber-red styling (`glow-red`, `bg-red-950/20`, etc.) when `isMuted` is active to alert administrators.
+4. **Conditional Trigger Suppression**:
+   - Wrapped threat visual/audio executions (toasts, siren pings, body red pulses) inside an `if (!muteRef.current)` block inside the connection socket stream, keeping cumulative metrics and logs silent but fully functional.
+### Phase 17: UI Refactoring & LLM Prompt Optimization
+*Goal: Restructured layout alignment, moved alerts switch to Header, and engineered conversational logic.*
+
+1. **Header-Level Mute Switch (Action 1 & 2)**:
+   - Restored original Left Panel flexbox/grid layout and removed the large button to recover pixel-perfect sidebar sizing.
+   - Designed a responsive, elegant 28x28px toggle button placed next to the "NETGUARD BHARAT" main title.
+   - Wired standard `🔔` (Alerts Active) and slashed `🔕` (Alerts Muted) emojis/icons dynamically with the `isMuted` and `muteRef` hooks.
+2. **Explicit CORS options (Action 3)**:
+   - Configured `server.js` using a explicit `corsOptions` strict configuration object to secure HTTP endpoint requests.
+3. **Greeting Directives for Local AI (Action 4)**:
+   - Refined system instructions inside `/api/copilot` in `server.js`.
+   - Added specific rules ensuring the AI responds professionally to basic greetings (like "hi" or "hello") without dump-analyzing telemetry logs, reserving context scanning only for explicit user inquiries.
+
 ---
 
 ## 🛠️ Port Layout & Service Infrastructure
