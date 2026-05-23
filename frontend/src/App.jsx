@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { io } from 'socket.io-client';
 import GlobeMap from './components/GlobeMap';
-import { Activity, ShieldAlert, Cpu, Network, HelpCircle, X, Info, Shield, ShieldOff, Trash2, Camera, Download, Eye, EyeOff, MapPin, Crosshair, CheckCircle, Volume2, VolumeX } from 'lucide-react';
+import { Activity, ShieldAlert, Cpu, Network, HelpCircle, X, Info, Shield, ShieldOff, Trash2, Camera, Download, Eye, EyeOff, MapPin, Crosshair, CheckCircle, Volume2, VolumeX, Maximize2, Minimize2 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import toast, { Toaster } from 'react-hot-toast';
@@ -25,10 +25,12 @@ function App() {
   const [lifetimeLeaks, setLifetimeLeaks] = useState(0);
 
   const [chatHistory, setChatHistory] = useState([
-    { role: 'ai', text: 'System secure. I am ready to analyze the latest network telemetry. How can I assist?' }
+    { role: 'ai', text: 'Hi Admin. I am your NetGuard AI Copilot. I am actively monitoring your network telemetry. How can I help you today?' }
   ]);
   const [isCopilotLoading, setIsCopilotLoading] = useState(false);
   const [copilotInput, setCopilotInput] = useState('');
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [aiEngine, setAiEngine] = useState('local');
   const chatEndRef = useRef(null);
 
   useEffect(() => {
@@ -247,7 +249,8 @@ function App() {
     if (!copilotInput.trim()) return;
     const userText = copilotInput.trim();
     
-    setChatHistory(prev => [...prev, { role: 'user', text: userText }]);
+    const newHistory = [...chatHistory, { role: 'user', text: userText }];
+    setChatHistory(newHistory);
     setCopilotInput('');
     setIsCopilotLoading(true);
 
@@ -257,7 +260,7 @@ function App() {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ userQuery: userText })
+        body: JSON.stringify({ userQuery: userText, chatHistory: newHistory, aiEngine })
       });
 
       if (!response.ok) {
@@ -268,7 +271,7 @@ function App() {
       setChatHistory(prev => [...prev, { role: 'ai', text: data.reply || 'No response received.' }]);
     } catch (error) {
       console.error('Copilot Chat Error:', error);
-      setChatHistory(prev => [...prev, { role: 'ai', text: '🚨 Connection to local AI engine failed. Please ensure the local Ollama instance and proxy server are active.' }]);
+      setChatHistory(prev => [...prev, { role: 'ai', text: '🚨 Connection to AI engine failed. Please ensure the proxy server is active.' }]);
     } finally {
       setIsCopilotLoading(false);
     }
@@ -503,23 +506,22 @@ function App() {
           <div className="lp-section-label">REAL-TIME CONTROLS</div>
           <div className="controls-panel" style={{ marginTop: 0 }}>
             <button 
-              className={`action-btn ${shieldActive ? 'glow-green' : ''} text-sm`}
+              className={`action-btn ${shieldActive ? 'glow-green' : ''}`}
               onClick={() => setShieldActive(!shieldActive)}
             >
               ● SHIELD {shieldActive ? 'ACTIVE' : 'OFFLINE'}
             </button>
             <button 
               onClick={() => setIsPcapActive(!isPcapActive)}
-              className={`py-2 px-4 rounded font-bold text-sm transition-all duration-200 active:scale-95 flex items-center justify-center gap-2 ${
-                isPcapActive ? 'bg-slate-800 border border-red-500/50 text-red-400 shadow-[0_0_10px_rgba(239,68,68,0.15)]' : 'bg-slate-900 border border-slate-700 text-slate-500'
+              className={`action-btn transition-all duration-200 active:scale-95 ${
+                isPcapActive ? 'bg-slate-800 border-red-500/50 text-red-400 shadow-[0_0_10px_rgba(239,68,68,0.15)]' : 'bg-slate-900 border-slate-700 text-slate-500'
               }`}
-              style={{ flex: '1 1 130px' }}
             >
               {isPcapActive ? <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse"></span> : <span className="h-2 w-2 rounded-full bg-slate-600"></span>}
               PCAP LOGGING
             </button>
             <button 
-              className="action-btn text-sm"
+              className="action-btn"
               onClick={clearLogs}
             >
               ♺ SWEEP
@@ -527,7 +529,7 @@ function App() {
 
             <button 
               onClick={() => alert("Initiating backend download of full threat_history.csv...")}
-              className="py-2 px-4 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded font-bold text-xs text-slate-300 transition-all active:scale-95 flex items-center justify-center gap-2"
+              className="action-btn bg-slate-800 hover:bg-slate-700 border-slate-600 text-slate-300 transition-all active:scale-95"
             >
               ⭳ EXPORT ALL (CSV)
             </button>
@@ -535,22 +537,22 @@ function App() {
 
           <div style={{ marginTop: 'auto' }}>
             <div className="lp-section-label">INTELLIGENCE FILTERS</div>
-            <div className="controls-panel" style={{ marginTop: 0, gap: '8px' }}>
+            <div className="controls-panel" style={{ marginTop: 0, gap: '6px' }}>
               <button 
-                className={`action-btn ${stealthMode ? 'glow-cyan' : ''} text-sm`}
+                className={`action-btn ${stealthMode ? 'glow-cyan' : ''}`}
                 onClick={toggleStealth}
                 style={{ flex: '1 1 100%' }}
               >
                 ∿ STEALTH {stealthMode ? 'ON (Hide Safe)' : 'OFF'}
               </button>
               <button 
-                className={`action-btn ${showNoise ? 'glow-gray' : ''} text-sm`}
+                className={`action-btn ${showNoise ? 'glow-gray' : ''}`}
                 onClick={toggleNoise}
               >
                 ∿ NOISE {showNoise ? 'ON' : 'OFF'}
               </button>
               <button 
-                className={`action-btn ${geofenceIndia ? 'glow-red' : ''} text-sm`}
+                className={`action-btn ${geofenceIndia ? 'glow-red' : ''}`}
                 onClick={toggleGeo}
               >
                 ◎ GEOFENCE {geofenceIndia ? 'IN' : 'ALL'}
@@ -560,7 +562,7 @@ function App() {
         </div>
 
         {/* Right Side: Tabbed Panel */}
-        <div className="panel sidebar" style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+        <div className="panel sidebar" style={{ display: 'flex', flexDirection: 'column', gap: 0, backdropFilter: isExpanded ? 'none' : 'blur(12px)', WebkitBackdropFilter: isExpanded ? 'none' : 'blur(12px)' }}>
 
           {/* Tab Navigation */}
           <div className="tab-nav">
@@ -581,10 +583,68 @@ function App() {
 
           {/* ── TAB: AI Copilot ── */}
           {activeTab === 'copilot' && (
-            <div className="tab-content" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-              <div className="copilot-header" style={{ flexShrink: 0 }}>
-                <div className="live-indicator" style={{ background: '#a855f7' }}></div>
-                <span style={{ color: '#a855f7' }}>AI COPILOT</span>
+            <div className={`tab-content ${isExpanded ? 'copilot-expanded' : ''}`} style={isExpanded ? {
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              width: '100vw',
+              height: '100vh',
+              zIndex: 99999,
+              background: 'rgba(15, 23, 42, 0.95)',
+              backdropFilter: 'blur(10px)',
+              display: 'flex',
+              flexDirection: 'column',
+              padding: '2rem',
+              border: '1px solid rgba(168,85,247,0.3)',
+              boxSizing: 'border-box'
+            } : { display: 'flex', flexDirection: 'column', height: '100%' }}>
+              <div className="copilot-header" style={{ flexShrink: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div className="live-indicator" style={{ background: '#a855f7' }}></div>
+                  <span style={{ color: '#a855f7', fontWeight: 'bold' }}>AI COPILOT</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ display: 'flex', background: 'rgba(0,0,0,0.3)', borderRadius: '6px', border: '1px solid rgba(168,85,247,0.2)', overflow: 'hidden' }}>
+                    <button
+                      onClick={() => setAiEngine('local')}
+                      style={{
+                        padding: '4px 10px',
+                        fontSize: '0.7rem',
+                        fontWeight: 'bold',
+                        background: aiEngine === 'local' ? 'rgba(168,85,247,0.3)' : 'transparent',
+                        color: aiEngine === 'local' ? '#e9d5ff' : '#a855f7',
+                        border: 'none',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      EDGE AI (Local)
+                    </button>
+                    <button
+                      onClick={() => setAiEngine('cloud')}
+                      style={{
+                        padding: '4px 10px',
+                        fontSize: '0.7rem',
+                        fontWeight: 'bold',
+                        background: aiEngine === 'cloud' ? 'rgba(168,85,247,0.3)' : 'transparent',
+                        color: aiEngine === 'cloud' ? '#e9d5ff' : '#a855f7',
+                        border: 'none',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      CLOUD AI (Gemini)
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => setIsExpanded(!isExpanded)}
+                    className="cursor-pointer flex items-center justify-center transition-all duration-200 hover:scale-110 p-1 rounded-md text-purple-400 hover:text-purple-300"
+                    style={{ background: 'transparent', border: 'none' }}
+                    title={isExpanded ? "Collapse Copilot" : "Expand Copilot Fullscreen"}
+                  >
+                    {isExpanded ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+                  </button>
+                </div>
               </div>
               
               {/* Message Window */}
@@ -599,7 +659,7 @@ function App() {
                 flexDirection: 'column',
                 gap: '12px',
                 marginBottom: '10px',
-                maxHeight: 'calc(100vh - 250px)'
+                maxHeight: isExpanded ? 'calc(100vh - 150px)' : 'calc(100vh - 250px)'
               }}>
                 {chatHistory.map((msg, idx) => (
                   <div

@@ -1,3 +1,6 @@
+require('dotenv').config();
+const { GoogleGenerativeAI } = require("@google/generative-ai");
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const { exec } = require('child_process');
 const geoip = require('geoip-lite');
 const { Server } = require('socket.io');
@@ -74,53 +77,83 @@ app.post('/api/alert', (req, res) => {
 // --- AI COPILOT ENDPOINT ---
 app.post('/api/copilot', async (req, res) => {
   try {
-    const { userQuery } = req.body || {};
+    // TODO: Update the Python network_baseline/enterprise_tap script later to include a payload_size_bytes metric so the AI can analyze data exfiltration volume.
+    const { userQuery, aiEngine = 'local' } = req.body || {};
     
-    // Gather up to the 15 most recent logs
-    const recentLogs = logHistory.slice(-15);
-    const logsContext = recentLogs.map((log, idx) => {
-      return `[${idx + 1}] Timestamp: ${log.timestamp}, App: ${log.appName || 'Unknown'}, Target: ${log.dataType || 'Unknown'}, Country: ${log.country || 'Unknown'}, Severity: ${log.severity || 'Unknown'}, Threat: ${log.isThreat ? 'Yes' : 'No'}${log.message ? `, Message: ${log.message}` : ''}`;
-    }).join('\n');
+    // Gather up to the 50 most recent logs
+    const recentLogs = logHistory.slice(-50);
+    
+    function sanitizeLogs(logsArray) {
+      return logsArray.map(log => {
+        const scrubbed = { ...log };
+        if (scrubbed.dataType) {
+          scrubbed.dataType = '[REDACTED_IP]';
+        }
+        return scrubbed;
+      });
+    }
 
-    // Construct prompt
-    let prompt = `You are NetGuard Copilot, an expert cybersecurity analyst.
+    const buildPrompt = (logsToUse, isCloud) => {
+      const logsContext = logsToUse.map((log, idx) => {
+        return `[${idx + 1}] Timestamp: ${log.timestamp}, App: ${log.appName || 'Unknown'}, Target: ${log.dataType || 'Unknown'}, Country: ${log.country || 'Unknown'}, Severity: ${log.severity || 'Unknown'}, Threat: ${log.isThreat ? 'Yes' : 'No'}${log.message ? `, Message: ${log.message}` : ''}`;
+      }).join('\n');
+
+      let prompt = `You are NetGuard Copilot, an expert cybersecurity analyst.
 Analyze the provided network logs. Identify any anomalies, large data payloads, or suspicious IPs. Be concise, professional, and do not use markdown formatting.
 
 CRITICAL DIRECTIVES:
 1. If the user's query is a simple greeting (such as "hi", "hello", "hey", "greetings"), you MUST simply greet the user back professionally, acknowledge your role as NetGuard Copilot, and ask how you can assist them today.
 2. If the user's query is a simple greeting, you MUST NOT analyze or output any of the context logs below. Completely ignore the logs in your response in this case.
 3. Only analyze the network logs and discuss telemetry or threats if the user explicitly asks a question about the system, logs, anomalies, network activity, or security threats.
+4. You are analyzing the last 50 network logs. If the user asks for data that is not present in the provided JSON schema (such as payload sizes), explicitly state that the telemetry tap is not currently capturing that specific metric, but analyze the remaining available metrics (like IPs, Ports, and Severity).`;
 
-Recent Network Logs:
-${logsContext || 'No logs recorded yet.'}`;
-    if (userQuery) {
-      prompt += `\n\nUser Query: ${userQuery}`;
+      if (isCloud) {
+        prompt += `\n5. Security Notice: Specific IP addresses have been deliberately scrubbed from these logs and replaced with placeholders to enforce Zero-Trust privacy protocols. Do not flag missing IPs as an error. Focus your analysis purely on application behavior, geographic routing, and severity flags.`;
+      }
+
+      prompt += `\n\nRecent Network Logs:\n${logsContext || 'No logs recorded yet.'}`;
+      if (userQuery) {
+        prompt += `\n\nUser Query: ${userQuery}`;
+      }
+      return prompt;
+    };
+
+    if (aiEngine === 'cloud') {
+      console.log("[☁️ CLOUD ENGINE] Routing request to Gemini (Sanitized Data)...");
+      const scrubbedLogs = sanitizeLogs(recentLogs);
+      const cloudPrompt = buildPrompt(scrubbedLogs, true);
+      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+      const result = await model.generateContent(cloudPrompt);
+      const response = await result.response;
+      const text = response.text();
+      return res.status(200).json({ reply: text });
+    } else {
+      // Call Ollama API
+      const localPrompt = buildPrompt(recentLogs, false);
+      const response = await fetch('http://127.0.0.1:11434/api/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'llama3.2:1b',
+          prompt: localPrompt,
+          stream: false
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Ollama responded with status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return res.status(200).json({ reply: data.response });
     }
-
-    // Call Ollama API
-    const response = await fetch('http://127.0.0.1:11434/api/generate', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'llama3.2:1b',
-        prompt: prompt,
-        stream: false
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error(`Ollama responded with status: ${response.status}`);
-    }
-
-    const data = await response.json();
-    res.status(200).json({ reply: data.response });
   } catch (error) {
-    console.error("OLLAMA FETCH ERROR:", error.message || error);
+    console.error("AI FETCH ERROR:", error.message || error);
     console.error('Error in AI Copilot endpoint:', error);
     res.status(500).json({ 
-      reply: 'Sorry, I encountered an error. Please make sure that the local Ollama instance is running with the llama3.2:1b model.' 
+      reply: 'Sorry, I encountered an error. Please ensure the requested AI engine is active and configured correctly.' 
     });
   }
 });
@@ -161,8 +194,7 @@ io.on('connection', (s) => {
 });
 
 let processMap = {}; // Global cache for PID -> AppName mapping
-let activeConnectionsCache = new Map(); // To avoid spamming the same connection
-let totalActive = 0;
+let activeConnectionsMap = new Map(); // Use Source/Destination IP as key, timestamp as value
 
 // 1. Separate Process Cache Refresher (Runs every 5 seconds)
 function refreshProcessCache() {
@@ -197,7 +229,6 @@ function pollNetwork() {
     if (errNet) return;
 
     const lines = stdoutNet.split('\n');
-    totalActive = lines.length;
 
     lines.forEach(line => {
       const parts = line.trim().split(/\s+/);
@@ -213,9 +244,13 @@ function pollNetwork() {
       const remoteIp = remoteAddr.split(':')[0]; // remove port
       if (!remoteIp || remoteIp === '0.0.0.0') return;
 
-      const connectionKey = `${pid}-${localAddr}-${remoteAddr}`;
+      const connectionKey = `${localAddr}-${remoteAddr}`;
+      const isNewConnection = !activeConnectionsMap.has(connectionKey);
       
-      if (!activeConnectionsCache.has(connectionKey)) {
+      // Update the Map with the current timestamp
+      activeConnectionsMap.set(connectionKey, Date.now());
+      
+      if (isNewConnection) {
         // INSTANT LOOKUP from Cache
         const appName = processMap[pid] || 'Unknown Process';
         const geo = geoip.lookup(remoteIp);
@@ -227,7 +262,6 @@ function pollNetwork() {
           let severity = 'THREAT';
           const lowerApp = appName.toLowerCase().replace(/[\[\]]/g, '');
           
-          // 1. Professional Heuristic Whitelist
           // 1. Comprehensive Professional Heuristic Whitelist
           const SYSTEM_WHITELIST = [
             // Browsers
@@ -255,13 +289,13 @@ function pollNetwork() {
             'system', 'unknown process'
           ];
           
-          let isThreat = true; // Default to true [Rule 3]
+          let isThreat = true; // Default to true
 
-          // RULE 1: Trusted Whitelist Check (Green/Silent)
+          // RULE 1: Trusted Whitelist Check
           const isWhitelisted = SYSTEM_WHITELIST.includes(lowerApp);
           if (isWhitelisted) isThreat = false;
 
-          // RULE 2: Domestic Traffic Check (Green/Silent)
+          // RULE 2: Domestic Traffic Check
           if (geo.country === 'IN') isThreat = false;
 
           // RULE 3: Flag as Threat if it fails BOTH
@@ -284,24 +318,23 @@ function pollNetwork() {
           addLogToHistory(event);
           io.emit('leak_event', event);
           if (isThreat) console.log(`[ALERT] ${appName} -> ${remoteIp} (${geo.country})`);
-          
-          activeConnectionsCache.set(connectionKey, true);
         }
       }
     });
-
-    io.emit('active_count', totalActive);
-    
-    // FAST REFRESH: Clear cache every 10 seconds to keep the globe "Live"
-    // This ensures recurring connections are re-emitted and visualized.
-    if (!global.cacheClearTimer) {
-      global.cacheClearTimer = setInterval(() => {
-        activeConnectionsCache.clear();
-        console.log('[SYSTEM] Connection cache flushed for real-time visualization.');
-      }, 10000);
-    }
   });
 }
+
+// Memory Leak Fix: Prune old connections from the Map every 5 seconds
+setInterval(() => {
+  const now = Date.now();
+  for (let [key, timestamp] of activeConnectionsMap.entries()) {
+    if (now - timestamp > 30000) { // Older than 30 seconds
+      activeConnectionsMap.delete(key);
+    }
+  }
+  // Emit updated map size to the UI
+  io.emit('active_count', activeConnectionsMap.size);
+}, 5000);
 
 console.log(`\n=================================================`);
 console.log(`🚀 NetGuard OPTIMIZED LIVE SNIFFER STARTED 🚀`);

@@ -39,10 +39,11 @@ The project is built to help identify anomalous outbound traffic, track where lo
 *   `behavioral_engine.py`: Scans the packet log file for anomalies (like payloads greater than 1000 bytes leaving the local network) and alerts the Node.js backend.
 *   Detects the active network interface automatically on launch.
 
-### 🤖 AI Copilot (Local Ollama)
-*   **Local LLM Integration**: Uses a local Ollama instance running `llama3.2:1b` to act as an offline cybersecurity analyst.
-*   **Express AI Bridge**: Has a `/api/copilot` POST route that feeds the 15 most recent network events as context to the model.
-*   **Smart Greeting Directive**: Automatically catches simple greetings (like "hi" or "hello") to reply with a friendly, professional intro instead of dumping or analyzing the logs unnecessarily.
+### 🤖 AI Copilot (Dual-Engine: Edge + Cloud)
+*   **Local Edge AI (Ollama)**: Deploys a local `llama3.2:1b` model for offline, private cybersecurity analysis, ensuring zero external data transmission.
+*   **Cloud AI (Gemini)**: Integrates the `@google/generative-ai` API utilizing the `gemini-2.5-flash` model for high-speed, comprehensive threat inference.
+*   **Data Privacy Middleware**: Actively intercepts and scrubs raw IP address telemetry, substituting it with `[REDACTED_IP]` on the backend prior to any cloud transmission.
+*   **Dynamic Prompting**: Seamlessly switches inference pipelines, identifies conversational greetings to bypass log analysis, and evaluates threats using a 50-log sliding context window.
 
 ---
 
@@ -79,13 +80,22 @@ Because the Python script sniffs raw network packets in promiscuous mode, **you 
    python behavioral_engine.py
    ```
 
-### 🧠 3. Local AI Copilot Setup
-To enable the offline AI chatbot:
-1. Install **[Ollama](https://ollama.com/)** on your system.
-2. In your terminal, download and start the model:
+### 🧠 3. AI Copilot Setup (Local & Cloud)
+To enable the interactive chatbot, you may configure the Local engine, the Cloud engine, or both.
+
+**For Local Edge Inference (Ollama):**
+1. Install **[Ollama](https://ollama.com/)** on your host system.
+2. Download and initialize the local model:
    ```bash
    ollama run llama3.2:1b
    ```
-3. Once the model is active, the dashboard will automatically connect and route chats through `http://localhost:11434`.
 
-*Note: The frontend dashboard will run fine with just the Node backend (`server.js` using netstat polling). The Python Scapy Tap and Ollama are optional add-ons to unlock deeper packet metrics and interactive chats.*
+**For Cloud Inference (Gemini):**
+1. Generate a Gemini API Key via Google AI Studio.
+2. Create a `.env` configuration file within the `proxy-server` directory.
+3. Define the environment variable as follows:
+   ```env
+   GEMINI_API_KEY="your-api-key-here"
+   ```
+
+*Note: The frontend dashboard operates independently with the Node backend (`server.js`). The Python packet tap and AI inference engines are modular extensions designed for advanced behavioral analysis.*

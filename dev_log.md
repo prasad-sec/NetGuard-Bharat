@@ -54,3 +54,11 @@ The system consists of three main components:
 *   Placed a subtle, clickable bell button (`🔔`/`🔕`) next to the "NETGUARD BHARAT" main title in the header, keeping the left controls panel flexbox aligned and clean.
 *   Wrapped the visual red pulses (`threat-pulse`), toast pop-ups, and audio siren pings inside `!muteRef.current` filters in the Socket listener, letting telemetry data arrays and UI statistics update silently without alert fatigue.
 *   Engineered system chat prompt instructions inside `/api/copilot` to check for simple greetings (such as "hi" or "hello") and respond professionally without scanning or printing logs unnecessarily.
+
+### 🧠 Phase 8: Cloud AI (Gemini) Integration & Architecture Stabilization
+*   **Dual-Engine Architecture**: Integrated the `@google/generative-ai` SDK, establishing a seamless toggle between Local Edge AI (Ollama) and Cloud AI (Gemini Flash) inference pipelines directly from the frontend interface.
+*   **Zero-Trust Data Sanitization**: Implemented a `sanitizeLogs` middleware function to intercept payload transmissions to the Cloud engine. This protocol securely scrubs raw IP routing data, substituting it with `[REDACTED_IP]` to enforce strict data privacy.
+*   **Extended Context Window**: Expanded the AI's sliding context window to analyze the 50 most recent logs. System prompt instructions were refined to acknowledge data redactions and absent payload schema metrics, thereby mitigating model hallucination.
+*   **Memory Leak Resolution**: Resolved an unbounded accumulation bug within the backend connection tracker. Migrated the stateless counter to a timestamp-driven `activeConnectionsMap`, and deployed a 5-second garbage collection cycle to prune socket data exceeding a 30-second TTL.
+*   **CSS Stacking Context Fix**: Resolved an issue where the Copilot modal overlay was constrained by the parent container's `backdrop-filter`. The rendering logic was refactored to conditionally disable the filter during expansion, allowing the `position: fixed` architecture to correctly bind to the viewport.
+*   **UI Hierarchy Scaling**: Executed a precision scaling pass on the Left Panel interface, reducing button dimensions and standardizing component gaps to achieve a compact, enterprise-grade aesthetic.

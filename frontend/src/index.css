@@ -497,20 +497,21 @@ h1, h2, h3, h4, .mono {
 /* Real-Time Control Panel Buttons */
 .controls-panel {
   display: flex;
-  margin-top: 15px;
-  gap: 10px;
+  margin-top: 8px;
+  gap: 6px;
   flex-wrap: wrap;
 }
 
 .action-btn {
-  flex: 1 1 130px; /* Grow, shrink, and base width to ensure 2 per row */
-  padding: 8px 4px;
+  flex: 1 1 110px; /* Reduced base width */
+  padding: 5px 4px; /* Scaled down padding */
   border-radius: 6px;
   border: 1px solid rgba(255,255,255,0.1);
   background: rgba(0,0,0,0.4);
   color: var(--text-main);
   font-family: 'Share Tech Mono', monospace;
-  font-size: 0.875rem; /* Increased font size for legibility */
+  font-size: 0.75rem; /* Scaled down font size to ~12px */
+  min-height: 28px; /* Compact height */
   display: flex;
   align-items: center;
   justify-content: center;
