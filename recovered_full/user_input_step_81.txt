@@ -1,0 +1,75 @@
+<USER_REQUEST>
+CRITICAL OVERRIDE: NUCLEAR WIPE AND REPLACE (CONTEXT POISONED)
+
+Your context window is poisoned with a broken layout. You are hallucinating a thick right border, breaking the gradient, and failing to align the widgets. You must STOP attempting to patch the existing code. WIPE the entire Left Panel component from your memory and replace it line-for-line with the exact code provided below.
+
+Execution Directive: Replace the entire Left Panel <div> structure with this exact code. Do NOT modify the inline styles. Do NOT add any extra Tailwind border classes. Execute natively without code blocks.
+
+JavaScript
+<div className="w-[320px] min-w-[320px] h-screen flex flex-col bg-[#0b1120] border-r border-cyan-900/50 p-4 relative z-10 overflow-hidden">
+  
+  {/* 1. HEADER - BULLETPROOF TRICOLOR INLINE STYLE */}
+  <div className="flex flex-row items-center gap-2 mb-6 shrink-0">
+    <span className="text-cyan-400 font-black tracking-widest text-xl">NETGUARD</span>
+    <span 
+      className="font-black tracking-widest text-xl drop-shadow-md"
+      style={{
+        backgroundImage: 'linear-gradient(to right, #FF9933 0%, #FF9933 33.3%, #FFFFFF 33.3%, #FFFFFF 66.6%, #138808 66.6%, #138808 100%)',
+        WebkitBackgroundClip: 'text',
+        WebkitTextFillColor: 'transparent',
+        color: 'transparent'
+      }}
+    >
+      BHARAT
+    </span>
+  </div>
+
+  {/* 2. SCROLLABLE INNER CONTENT (NO RIGHT BORDER ALLOWED) */}
+  <div className="flex flex-col gap-6 overflow-y-auto flex-grow min-h-0 pr-2 pb-4 scrollbar-hide">
+    
+    {/* Metrics */}
+    <div className="flex flex-row gap-4 w-full">
+      <div className="flex-1 flex flex-col items-center justify-center bg-gray-900/40 border border-gray-800 rounded p-3">
+        <span className="text-red-500 font-black text-3xl mb-1">{totalLeaks || 1}</span>
+        <span className="text-[10px] text-gray-400 uppercase tracking-widest text-center leading-tight">Total Leaks<br/>Detected</span>
+      </div>
+      <div className="flex-1 flex flex-col items-center justify-center bg-gra
+<truncated 2817 bytes>
+-center justify-center border border-cyan-500/30 bg-[#060b14] p-4 rounded mt-2">
+      <span className="text-[10px] text-cyan-700 font-bold uppercase tracking-widest mb-1">Protected Endpoints</span>
+      <span className="text-3xl font-black text-cyan-400">{activeEndpointsCount || 1}</span>
+      <span className="text-[9px] text-gray-500 mt-1 uppercase tracking-wider">Host + Proxy Subnet</span>
+    </div>
+
+  </div>
+
+  {/* 3. ANCHORED BOTTOM FILTERS */}
+  <div className="mt-auto pt-4 border-t border-cyan-500/20 shrink-0 flex flex-col gap-2 bg-[#0b1120]">
+     <span className="text-[10px] text-gray-500 uppercase tracking-widest mb-1">Intelligence Filters</span>
+     <button className="border border-cyan-500/50 bg-cyan-500/10 text-cyan-400 text-xs py-2 rounded w-full hover:bg-cyan-500/20">
+       ~ STEALTH ON (HIDE SAFE)
+     </button>
+     <div className="flex flex-row gap-2">
+       <button className="border border-gray-700 bg-gray-900/50 text-gray-400 text-xs py-2 rounded flex-1 hover:text-white">
+         ~ NOISE OFF
+       </button>
+       <button className="border border-red-500/50 bg-red-500/10 text-red-500 text-xs py-2 rounded flex-1 flex items-center justify-center gap-2 hover:bg-red-500/20">
+         <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>
+         GEOFENCE IN
+       </button>
+     </div>
+  </div>
+
+</div>
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-05-28T12:15:53+05:30.
+
+The user's current state is as follows:
+Other open documents:
+- c:\Users\PRASAD DABHEKAR\OneDrive\Documents\NetGuardBharat\proxy-server\.env (LANGUAGE_UNSPECIFIED)
+- c:\Users\PRASAD DABHEKAR\OneDrive\Documents\NetGuardBharat\.gitignore (LANGUAGE_UNSPECIFIED)
+- c:\Users\PRASAD DABHEKAR\OneDrive\Documents\NetGuardBharat\README.md (LANGUAGE_MARKDOWN)
+- c:\Users\PRASAD DABHEKAR\OneDrive\Documents\NetGuardBharat\backend\enterprise_tap.py (LANGUAGE_PYTHON)
+- c:\Users\PRASAD DABHEKAR\OneDrive\Documents\NetGuardBharat\frontend\src\components\MermaidChart.jsx (LANGUAGE_JAVASCRIPT)
+</ADDITIONAL_METADATA>

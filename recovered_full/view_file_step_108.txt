@@ -1,0 +1,82 @@
+Created At: 2026-05-28T06:48:01Z
+Completed At: 2026-05-28T06:48:01Z
+File Path: `file:///c:/Users/PRASAD%20DABHEKAR/OneDrive/Documents/NetGuardBharat/frontend/src/App.jsx`
+Total Lines: 1005
+Total Bytes: 44993
+Showing lines 440 to 600
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+440:   }
+441: 
+442:   const totalLeaks = totalLeaked;
+443: 
+444:   return (
+445:     <div className="dashboard-container">
+446:       <Toaster position="bottom-right" reverseOrder={false} />
+447:       {/* Background 3D Cyber Globe */}
+448:       <GlobeMap arcsData={leaks.slice(0, 30)} focusPoint={focusPoint} /> {/* Keep max 30 recent arcs for performance */}
+449: 
+450:       {/* Floating UI Overlays */}
+451:       <div className="overlay-panels">
+452:         
+453:         {/* Left Side: Stats and Titles */}
+454:         <div className="panel header-panel">
+455:           <div>
+456:             <div className="flex items-center gap-3">
+457:               <h1 className="glitch-title tricolour-title" style={{ margin: 0 }}>NETGUARD BHARAT</h1>
+458:               <button
+459:                 onClick={toggleMuted}
+460:                 className={`cursor-pointer flex items-center justify-center transition-all duration-200 active:scale-90 p-1.5 rounded-md ${
+461:                   isMuted 
+462:                     ? 'bg-red-950/20 border border-red-500/30 text-red-400 shadow-[0_0_8px_rgba(239,68,68,0.15)]' 
+463:                     : 'bg-slate-900/40 border border-slate-700/40 text-slate-400 hover:text-white hover:bg-slate-800/40'
+464:                 }`}
+465:                 style={{ width: '28px', height: '28px' }}
+466:                 title={isMuted ? "Alerts Muted - Click to Unmute" : "Alerts Active - Click to Mute"}
+467:               >
+468:                 {isMuted ? '🔕' : '🔔'}
+469:               </button>
+470: 
+<truncated 4772 bytes>
+utton>
+560:             </div>
+561:           </div>
+562:         </div>
+563: 
+564:         {/* Right Side: Tabbed Panel */}
+565:         <div className="panel sidebar" style={{ display: 'flex', flexDirection: 'column', gap: 0, backdropFilter: isExpanded ? 'none' : 'blur(12px)', WebkitBackdropFilter: isExpanded ? 'none' : 'blur(12px)' }}>
+566: 
+567:           {/* Tab Navigation */}
+568:           <div className="tab-nav">
+569:             {[
+570:               { id: 'copilot', label: '🤖 AI Copilot' },
+571:               { id: 'feed',    label: '⚡ Intel Feed' },
+572:               { id: 'logs',   label: '🖥 Raw Logs' },
+573:             ].map(tab => (
+574:               <button
+575:                 key={tab.id}
+576:                 className={`tab-btn ${activeTab === tab.id ? 'tab-active' : ''}`}
+577:                 onClick={() => setActiveTab(tab.id)}
+578:               >
+579:                 {tab.label}
+580:               </button>
+581:             ))}
+582:           </div>
+583: 
+584:           {/* ── TAB: AI Copilot ── */}
+585:           {activeTab === 'copilot' && (
+586:             <div className={`tab-content ${isExpanded ? 'copilot-expanded' : ''}`} style={isExpanded ? {
+587:               position: 'fixed',
+588:               top: 0,
+589:               left: 0,
+590:               width: '100vw',
+591:               height: '100vh',
+592:               zIndex: 99999,
+593:               background: 'rgba(15, 23, 42, 0.95)',
+594:               backdropFilter: 'blur(10px)',
+595:               display: 'flex',
+596:               flexDirection: 'column',
+597:               padding: '2rem',
+598:               border: '1px solid rgba(168,85,247,0.3)',
+599:               boxSizing: 'border-box'
+600:             } : { display: 'flex', flexDirection: 'column', height: '100%' }}>
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.

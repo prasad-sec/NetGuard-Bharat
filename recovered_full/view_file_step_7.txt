@@ -1,0 +1,84 @@
+Created At: 2026-05-28T06:39:09Z
+Completed At: 2026-05-28T06:39:10Z
+File Path: `file:///c:/Users/PRASAD%20DABHEKAR/OneDrive/Documents/NetGuardBharat/frontend/src/App.jsx`
+Total Lines: 1532
+Total Bytes: 67646
+Showing lines 800 to 1100
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+800:       const key = generateSessionKey(log);
+801:       if (activeKeys[key] && !seen[key]) {
+802:         seen[key] = true;
+803:         uniqueArcs.push(log);
+804:       }
+805:       if (uniqueArcs.length >= 30) break; // cap at 30 arcs for WebGL performance
+806:     }
+807:     return uniqueArcs;
+808:   }, [rawLogs, activeKeys]);
+809: 
+810:   // Aggregate unique destination labels — one label per country to avoid globe clutter
+811:   const uniqueDestinations = useMemo(() => {
+812:     const seen = {};
+813:     const result = [];
+814:     for (const log of displayedArcs) {
+815:       const cc = log.country || '??';
+816:       if (!seen[cc] && log.endLat != null && log.endLng != null) {
+817:         seen[cc] = true;
+818:         result.push({
+819:           country_code: cc,
+820:           country_name: ISO_COUNTRY_NAMES[cc] || cc,  // fall back to code if unknown
+821:           target_lat: log.endLat,
+822:           target_lng: log.endLng,
+823:           severity: log.severity,
+824:         });
+825:       }
+826:     }
+827:     
+828:     // Action 2: Inject the Host Origin Label
+829:     const filteredResult = result.filter(d => d.country_name !== 'INDIA' && d.country_code !== 'IN');
+830:     const hostOrigin = { target_lat: 20.5937, target_lng: 78.9629, country_name: 'INDIA', isOrigin: true };
+831:     filteredResult.push(hostOrigin);
+832:     
+833:     return filteredResult;
+834:   }, [displayedArcs]);
+835: 
+836:   if (loading) {
+837:     return (
+838:       <div className="loading-screen">
+839:         <div className="glitch-overlay"></div>
+<truncated 13958 bytes>
+style={{
+1067:                 flex: 1,
+1068:                 overflowY: 'auto',
+1069:                 padding: '10px',
+1070:                 border: '1px solid rgba(168,85,247,0.15)',
+1071:                 borderRadius: '8px',
+1072:                 background: 'rgba(0,0,0,0.3)',
+1073:                 display: 'flex',
+1074:                 flexDirection: 'column',
+1075:                 gap: '12px',
+1076:                 marginBottom: '10px',
+1077:                 maxHeight: isExpanded ? 'calc(100vh - 150px)' : 'calc(100vh - 250px)'
+1078:               }}>
+1079:                 {chatHistory.map((msg, idx) => (
+1080:                   <div
+1081:                     key={idx}
+1082:                     className="pop-in"
+1083:                     style={{
+1084:                       alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
+1085:                       maxWidth: '85%',
+1086:                       background: msg.role === 'user' ? 'rgba(30,41,59,0.75)' : 'rgba(168,85,247,0.08)',
+1087:                       border: msg.role === 'user' ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(168,85,247,0.25)',
+1088:                       borderRadius: msg.role === 'user' ? '8px 8px 0px 8px' : '8px 8px 8px 0px',
+1089:                       padding: '8px 12px',
+1090:                       fontSize: '0.8rem',
+1091:                       lineHeight: '1.4',
+1092:                       color: '#e2e8f0',
+1093:                       boxShadow: msg.role === 'ai' ? '0 0 10px rgba(168,85,247,0.05)' : 'none'
+1094:                     }}
+1095:                   >
+1096:                     <div style={{
+1097:                       fontWeight: 'bold',
+1098:                       fontSize: '0.65rem',
+1099:                       color: msg.role === 'user' ? 'var(--accent-cyan)' : '#d8b4fe',
+1100:                       marginBottom: '4px',
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.

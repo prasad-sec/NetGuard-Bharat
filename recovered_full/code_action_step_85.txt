@@ -1,0 +1,55 @@
+Created At: 2026-05-28T06:46:03Z
+Completed At: 2026-05-28T06:46:05Z
+The following changes were made by the replace_file_content tool to: c:\Users\PRASAD DABHEKAR\OneDrive\Documents\NetGuardBharat\frontend\src\App.jsx. If relevant, proactively run terminal commands to execute this code for the USER. Don't ask for permission.
+[diff_block_start]
+@@ -868,10 +868,10 @@
+       <div className="overlay-panels">
+         
+         {/* Left Side: Stats and Titles */}
+-        <div className="w-[320px] min-w-[320px] max-w-[320px] h-screen flex flex-col bg-[#0b1120] border border-cyan-900/50 p-4 shadow-[0_0_15px_rgba(6,182,212,0.15)] relative z-10">
++        <div className="w-[320px] min-w-[320px] h-screen flex flex-col bg-[#0b1120] border-r border-cyan-900/50 p-4 relative z-10 overflow-hidden">
+           
+-          {/* 1. HEADER - INLINE STYLES (BULLETPROOF TRICOLOR) */}
+-          <div className="flex flex-row items-center gap-2 mb-6 shrink-0 whitespace-nowrap">
++          {/* 1. HEADER - BULLETPROOF TRICOLOR INLINE STYLE */}
++          <div className="flex flex-row items-center gap-2 mb-6 shrink-0">
+             <span className="text-cyan-400 font-black tracking-widest text-xl">NETGUARD</span>
+             <span 
+               className="font-black tracking-widest text-xl drop-shadow-md"
+@@ -878,6 +878,5 @@
+                 backgroundImage: 'linear-gradient(to right, #FF9933 0%, #FF9933 33.3%, #FFFFFF 33.3%, #FFFFFF 66.6%, #138808 66.6%, #138808 100%)',
+                 WebkitBackgroundClip: 'text',
+-                backgroundClip: 'text',
+                 WebkitTextFillColor: 'transparent',
+                 color: 'transparent'
+               }}
+@@ -885,20 +885,17 @@
+             </span>
+           </div>
+ 
+-          {/* 2. SCROLLABLE INNER CONTENT (MIN-H-0 ENFORCED) */}
+-          <div 
+-            className="flex flex-col gap-6 overflow-y-auto overflow-x-hidden pr-2 flex-grow min-h-0"
+-            style={{ borderRight: 'none' }}
+-          >
++          {/* 2. SCROLLABLE INNER CONTENT (NO RIGHT BORDER ALLOWED) */}
+
+<truncated 5764 bytes>
+pan>
+-             <button onClick={toggleStealth} className={`border text-xs py-2 rounded w-full transition-colors ${stealthMode ? 'border-cyan-500/50 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20' : 'border-gray-700 bg-gray-900/50 text-gray-400 hover:text-white'}`}>
++             <button onClick={toggleStealth} className="border border-cyan-500/50 bg-cyan-500/10 text-cyan-400 text-xs py-2 rounded w-full hover:bg-cyan-500/20">
+                ~ STEALTH {stealthMode ? 'ON (HIDE SAFE)' : 'OFF'}
+              </button>
+              <div className="flex flex-row gap-2">
+-               <button onClick={toggleNoise} className={`border text-xs py-2 rounded flex-1 transition-colors ${showNoise ? 'border-gray-500/50 bg-gray-700/50 text-white' : 'border-gray-700 bg-gray-900/50 text-gray-400 hover:text-white'}`}>
++               <button onClick={toggleNoise} className={`border text-xs py-2 rounded flex-1 hover:text-white ${showNoise ? 'border-gray-500/50 bg-gray-700/50 text-white' : 'border-gray-700 bg-gray-900/50 text-gray-400'}`}>
+                  ~ NOISE {showNoise ? 'ON' : 'OFF'}
+                </button>
+-               <button onClick={toggleGeo} className={`border text-xs py-2 rounded flex-1 flex items-center justify-center gap-2 transition-colors ${geofenceIndia ? 'border-red-500/50 bg-red-500/10 text-red-500 hover:bg-red-500/20' : 'border-gray-700 bg-gray-900/50 text-gray-400 hover:text-white'}`}>
++               <button onClick={toggleGeo} className="border border-red-500/50 bg-red-500/10 text-red-500 text-xs py-2 rounded flex-1 flex items-center justify-center gap-2 hover:bg-red-500/20">
+                  {geofenceIndia && <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>}
+                  GEOFENCE {geofenceIndia ? 'IN' : 'ALL'}
+                </button>
+[diff_block_end]
+
+Please note that the above snippet only shows the MODIFIED lines from the last change. It shows up to 3 lines of unchanged lines before and after the modified lines. The actual file contents may have many more lines not shown.

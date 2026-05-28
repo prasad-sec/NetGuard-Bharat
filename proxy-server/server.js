@@ -7,12 +7,49 @@ const { Server } = require('socket.io');
 const express = require('express');
 const http = require('http');
 const cors = require('cors');
+const fs = require('fs');
+const path = require('path');
 
+// Ensure exports directory exists
+const exportsDir = path.join(__dirname, 'exports');
+if (!fs.existsSync(exportsDir)) {
+  fs.mkdirSync(exportsDir);
+}
+
+let isPcapRecording = false;
+let pcapStream = null;
+let currentPcapFilename = null;
+
+const sqlite3 = require('sqlite3').verbose();
 const SOCKET_PORT = 3002;
 
 const app = express();
+
+const db = new sqlite3.Database('./netguard_telemetry.db', (err) => {
+  if (err) console.error("SQLite connection error:", err);
+  else {
+    db.run(`CREATE TABLE IF NOT EXISTS logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      timestamp TEXT,
+      process TEXT,
+      target_ip TEXT,
+      country TEXT,
+      severity TEXT,
+      threat TEXT
+    )`, () => {
+      const pruneDatabase = () => {
+        db.run(`DELETE FROM logs WHERE timestamp < datetime('now', '-7 days')`, function(err) {
+          if (err) console.error("[DB] Pruning error:", err);
+          else console.log(`[DB] Pruned ${this.changes} old logs from SQLite to enforce 7-day edge retention.`);
+        });
+      };
+      pruneDatabase();
+      setInterval(pruneDatabase, 24 * 60 * 60 * 1000);
+    });
+  }
+});
 const corsOptions = {
-  origin: 'http://localhost:5173',
+  origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
   methods: ['GET', 'POST'],
   allowedHeaders: ['Content-Type']
 };
@@ -34,45 +71,90 @@ function addLogToHistory(event) {
   }
 }
 
-const INDIA_CA = { lat: 21.0, lng: 78.0 }; // Default origin point for India
-
-// --- ENTERPRISE AI INTEGRATION ENDPOINT ---
-app.post('/api/alert', (req, res) => {
-  const telemetry = req.body;
-  if (!telemetry || !telemetry.destination_ip) {
-    return res.status(400).send({ error: "Invalid telemetry data" });
-  }
-
-  const remoteIp = telemetry.destination_ip;
-  const geo = geoip.lookup(remoteIp);
-  const country = geo ? geo.country : 'Unknown';
-  
-  const endLat = geo ? geo.ll[0] : 0;
-  const endLng = geo ? geo.ll[1] : 0;
-
-  // Emit critical threat event directly to the frontend Dashboard
-  const event = {
-    id: `anomaly-${Date.now()}-${Math.random()}`,
-    appName: "Deep Packet AI", // Specific app name to stand out in the UI
-    dataType: `${remoteIp} (${country})`,
-    country: country,
-    severity: telemetry.severity || "CRITICAL",
-    isWhitelisted: false,
-    isThreat: true,
-    startLat: INDIA_CA.lat + (Math.random() - 0.5) * 5, 
-    startLng: INDIA_CA.lng + (Math.random() - 0.5) * 5,
-    endLat: endLat,
-    endLng: endLng,
-    timestamp: telemetry.timestamp || new Date().toISOString(),
-    message: telemetry.message
-  };
-
+function broadcastAndStoreLog(event) {
   addLogToHistory(event);
   io.emit('leak_event', event);
-  console.log(`\n[🚨 AI THREAT DETECTED] Deep Packet AI flagged anomaly to ${remoteIp} (${country})`);
   
-  res.status(200).send({ success: true, message: "Alert processed and broadcasted." });
+  db.run(
+    `INSERT INTO logs (timestamp, process, target_ip, country, severity, threat) VALUES (?, ?, ?, ?, ?, ?)`,
+    [event.timestamp, event.appName, event.dataType, event.country, event.severity, event.isThreat ? 'Yes' : 'No']
+  );
+}
+
+const INDIA_CA = { lat: 21.0, lng: 78.0 }; // Default origin point for India
+
+// --- HISTORICAL EXPORT ENDPOINT ---
+app.post('/api/export/history', (req, res) => {
+  const { startDate, endDate } = req.body;
+  if (!startDate || !endDate) return res.status(400).json({ error: 'Missing dates' });
+  
+  const start = new Date(startDate);
+  start.setHours(0,0,0,0);
+  const end = new Date(endDate);
+  end.setHours(23,59,59,999);
+  
+  db.all(
+    `SELECT * FROM logs WHERE timestamp BETWEEN ? AND ?`, 
+    [start.toISOString(), end.toISOString()], 
+    (err, rows) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json(rows);
+    }
+  );
 });
+
+// --- PCAP SYNTHESIS API ---
+app.post('/api/pcap/toggle', (req, res) => {
+  const { action } = req.body;
+  if (action === 'start') {
+    if (isPcapRecording) return res.json({ status: 'already_recording' });
+    
+    currentPcapFilename = `netguard_capture_${Date.now()}.pcap`;
+    const filepath = path.join(exportsDir, currentPcapFilename);
+    pcapStream = fs.createWriteStream(filepath);
+    
+    // Write 24-byte PCAP Global Header
+    // Magic (4), Major(2), Minor(2), TimeZone(4), SigFigs(4), SnapLen(4), LinkType(4)
+    const globalHeader = Buffer.alloc(24);
+    globalHeader.writeUInt32LE(0xa1b2c3d4, 0); // Magic number
+    globalHeader.writeUInt16LE(2, 4); // Major version
+    globalHeader.writeUInt16LE(4, 6); // Minor version
+    globalHeader.writeInt32LE(0, 8); // GMT to local timezone correction
+    globalHeader.writeUInt32LE(0, 12); // Accuracy of timestamps
+    globalHeader.writeUInt32LE(65535, 16); // Max length of captured packets
+    globalHeader.writeUInt32LE(1, 20); // Data link type (1 = Ethernet)
+    
+    pcapStream.write(globalHeader);
+    isPcapRecording = true;
+    console.log(`[PCAP] Started synthetic capture: ${currentPcapFilename}`);
+    return res.json({ status: 'started' });
+    
+  } else if (action === 'stop') {
+    if (!isPcapRecording) return res.json({ status: 'not_recording' });
+    
+    isPcapRecording = false;
+    if (pcapStream) {
+      pcapStream.end();
+      pcapStream = null;
+    }
+    const finalFilename = currentPcapFilename;
+    currentPcapFilename = null;
+    console.log(`[PCAP] Stopped capture: ${finalFilename}`);
+    return res.json({ status: 'stopped', downloadUrl: `/api/pcap/download/${finalFilename}` });
+  }
+  return res.status(400).json({ error: 'Invalid action' });
+});
+
+app.get('/api/pcap/download/:filename', (req, res) => {
+  const filename = req.params.filename;
+  const filepath = path.join(exportsDir, filename);
+  if (fs.existsSync(filepath)) {
+    res.download(filepath);
+  } else {
+    res.status(404).json({ error: 'File not found' });
+  }
+});
+
 
 // --- AI COPILOT ENDPOINT ---
 app.post('/api/copilot', async (req, res) => {
@@ -80,8 +162,21 @@ app.post('/api/copilot', async (req, res) => {
     // TODO: Update the Python network_baseline/enterprise_tap script later to include a payload_size_bytes metric so the AI can analyze data exfiltration volume.
     const { userQuery, aiEngine = 'local' } = req.body || {};
     
-    // Gather up to the 50 most recent logs
-    const recentLogs = logHistory.slice(-50);
+    // Action 2 & 3: Database Context Fetch and CSV Compression
+    const fetchRecentContext = () => {
+      return new Promise((resolve, reject) => {
+        db.all(
+          `SELECT timestamp, process, target_ip, severity, threat FROM logs WHERE timestamp >= datetime('now', '-5 minutes')`,
+          [],
+          (err, rows) => {
+            if (err) return reject(err);
+            resolve(rows);
+          }
+        );
+      });
+    };
+
+    const recentLogs = await fetchRecentContext();
     
     function sanitizeLogs(logsArray) {
       return logsArray.map(log => {
@@ -94,18 +189,43 @@ app.post('/api/copilot', async (req, res) => {
     }
 
     const buildPrompt = (logsToUse, isCloud) => {
-      const logsContext = logsToUse.map((log, idx) => {
-        return `[${idx + 1}] Timestamp: ${log.timestamp}, App: ${log.appName || 'Unknown'}, Target: ${log.dataType || 'Unknown'}, Country: ${log.country || 'Unknown'}, Severity: ${log.severity || 'Unknown'}, Threat: ${log.isThreat ? 'Yes' : 'No'}${log.message ? `, Message: ${log.message}` : ''}`;
-      }).join('\n');
+      // Compress logs into dense CSV format to save token context window
+      const logsContext = ['Timestamp,Process,Target_IP,Severity,Threat'].concat(
+        logsToUse.map(log => `${log.timestamp},${log.process || 'Unknown'},${isCloud ? '[REDACTED_IP]' : (log.target_ip || 'Unknown')},${log.severity || 'Unknown'},${log.threat || 'Unknown'}`)
+      ).join('\n');
 
-      let prompt = `You are NetGuard Copilot, an expert cybersecurity analyst.
-Analyze the provided network logs. Identify any anomalies, large data payloads, or suspicious IPs. Be concise, professional, and do not use markdown formatting.
+      let prompt = `COMMUNICATION PROTOCOL: You are a tier-1 enterprise cybersecurity AI. You must be extremely concise, cold, and analytical.
+NEVER introduce yourself.
+NEVER say 'As NetGuard Copilot' or 'As an AI'.
+NEVER use filler greetings or conversational pleasantries.
+When asked a question, immediately output the technical answer or data analysis.
+Strip all conversational fluff from your outputs. Answer like a seasoned incident response lead.
+
+CRITICAL CAPABILITY AWARENESS: You are integrated into the NetGuard Bharat Enterprise UI. The frontend has a native Markdown-to-PDF conversion engine. If the user asks you to 'generate a PDF', 'export a report', or 'make a document', DO NOT say that you cannot create files. Instead, you MUST immediately write a highly detailed, professional markdown report analyzing the requested logs, and conclude your message by saying: 'I have compiled the requested intelligence. You may download the PDF report using the export button below.'
 
 CRITICAL DIRECTIVES:
-1. If the user's query is a simple greeting (such as "hi", "hello", "hey", "greetings"), you MUST simply greet the user back professionally, acknowledge your role as NetGuard Copilot, and ask how you can assist them today.
-2. If the user's query is a simple greeting, you MUST NOT analyze or output any of the context logs below. Completely ignore the logs in your response in this case.
-3. Only analyze the network logs and discuss telemetry or threats if the user explicitly asks a question about the system, logs, anomalies, network activity, or security threats.
-4. You are analyzing the last 50 network logs. If the user asks for data that is not present in the provided JSON schema (such as payload sizes), explicitly state that the telemetry tap is not currently capturing that specific metric, but analyze the remaining available metrics (like IPs, Ports, and Severity).`;
+1. Only analyze the network logs and discuss telemetry or threats if the user explicitly asks a question about the system, logs, anomalies, network activity, or security threats.
+2. Analyze the following telemetry data (Last 5 Minutes). Do not mention the CSV format. Output your intelligence report directly. If the user asks for data that is not present in the provided JSON schema (such as payload sizes), explicitly state that the telemetry tap is not currently capturing that specific metric, but analyze the remaining available metrics (like IPs, Ports, and Severity).
+
+REPORTING PROTOCOL: When asked to generate a report or analyze a time window, you MUST use rich Markdown formatting to create a visually striking document. You must adhere to the following structure:
+Use an H2 (##) for 'Executive Summary' and provide a high-level impact assessment.
+Use a Markdown Table (|---|---|) to display 'Event Statistics' (e.g., Total Logs, Severity Breakdown, Top Targeted Countries). Do not use plain text lists for stats.
+Use an H2 (##) for 'Threat Hypothesis' where you explain why this specific traffic pattern is dangerous (e.g., explaining why a 1440-byte MTU payload indicates data exfiltration). Use blockquotes (>) for critical warnings.
+Bold (**text**) all IP addresses, process names, and severity levels.
+When visualizing network topologies, you MUST use Mermaid.js. You are strictly forbidden from outputting raw Mermaid text. You MUST wrap the entire graph in \`\`\`mermaid backticks.
+When adding text labels to arrows, you MUST wrap the label strictly in pipe characters |.
+
+CORRECT FORMAT Example:
+\`\`\`mermaid
+graph TD;
+
+A[Attacker] -->|Injects SQL| B(Web App);
+
+B -->|Queries| C[(Database)];
+\`\`\`
+
+INCORRECT FORMAT (DO NOT USE): A --> Injects SQL B
+Conclude with the exact phrase: 'I have compiled the requested intelligence. You may download the PDF report using the export button below.'`;
 
       if (isCloud) {
         prompt += `\n5. Security Notice: Specific IP addresses have been deliberately scrubbed from these logs and replaced with placeholders to enforce Zero-Trust privacy protocols. Do not flag missing IPs as an error. Focus your analysis purely on application behavior, geographic routing, and severity flags.`;
@@ -167,8 +287,6 @@ let isMonitoring = true;
 const connectedSockets = new Set();
 io.on('connection', (s) => {
   connectedSockets.add(s);
-  
-  // Hydrate client with existing log history on connection
   s.emit('log_history', logHistory);
   
   s.on('custom_ping', (callback) => {
@@ -195,6 +313,10 @@ io.on('connection', (s) => {
 
 let processMap = {}; // Global cache for PID -> AppName mapping
 let activeConnectionsMap = new Map(); // Use Source/Destination IP as key, timestamp as value
+const knownSessions = new Map(); // Use Process-Destination IP as key for stateful diffing
+
+// In-memory RAM set — tracks unique local source IPs (never written to disk directly)
+const activeEndpoints = new Set();
 
 // 1. Separate Process Cache Refresher (Runs every 5 seconds)
 function refreshProcessCache() {
@@ -234,9 +356,83 @@ function pollNetwork() {
       const parts = line.trim().split(/\s+/);
       if (parts.length < 5) return;
       
-      const localAddr = parts[1];
+      const localAddr  = parts[1];
       const remoteAddr = parts[2];
-      const pid = parts[4];
+      const pid        = parts[4];
+
+      // Track unique local source IPs — exclude loopback, only accept LAN addresses
+      if (localAddr) {
+        const localIp = localAddr.split(':')[0];
+        if (
+          localIp &&
+          !localIp.startsWith('127.') &&
+          !localIp.startsWith('[::') &&
+          localIp !== '0.0.0.0' &&
+          (localIp.startsWith('192.168.') || localIp.startsWith('10.') || localIp.startsWith('172.'))
+        ) {
+          activeEndpoints.add(localIp);
+        }
+      }
+
+      // Action 2: PCAP Packet Synthesis in Polling Loop
+      if (isPcapRecording && pcapStream && localAddr && remoteAddr) {
+        try {
+          const localIp = localAddr.split(':')[0];
+          const localPort = parseInt(localAddr.split(':')[1]) || 0;
+          const remoteIp = remoteAddr.split(':')[0];
+          const remotePort = parseInt(remoteAddr.split(':')[1]) || 0;
+          
+          if (localIp && remoteIp && localIp !== '0.0.0.0' && remoteIp !== '0.0.0.0' && !remoteIp.startsWith('127.') && !remoteIp.includes('[')) {
+            const ipToBytes = (ip) => {
+              const parts = ip.split('.');
+              if (parts.length !== 4) return Buffer.from([0,0,0,0]);
+              return Buffer.from(parts.map(p => parseInt(p, 10)));
+            };
+
+            const pkt = Buffer.alloc(70);
+            
+            // 1. PCAP Packet Header (16 bytes)
+            const tsSec = Math.floor(Date.now() / 1000);
+            const tsUsec = (Date.now() % 1000) * 1000;
+            pkt.writeUInt32LE(tsSec, 0);
+            pkt.writeUInt32LE(tsUsec, 4);
+            pkt.writeUInt32LE(54, 8); // incl_len
+            pkt.writeUInt32LE(54, 12); // orig_len
+            
+            // 2. Ethernet Header (14 bytes) [Offset 16]
+            Buffer.from([0x00,0x11,0x22,0x33,0x44,0x55]).copy(pkt, 16); // Dst MAC
+            Buffer.from([0x66,0x77,0x88,0x99,0xaa,0xbb]).copy(pkt, 22); // Src MAC
+            pkt.writeUInt16BE(0x0800, 28); // EtherType: IPv4
+            
+            // 3. IPv4 Header (20 bytes) [Offset 30]
+            pkt.writeUInt8(0x45, 30); // Version (4) + IHL (5)
+            pkt.writeUInt8(0x00, 31); // DSCP/ECN
+            pkt.writeUInt16BE(40, 32); // Total Length (20 IP + 20 TCP)
+            pkt.writeUInt16BE(0, 34); // Identification
+            pkt.writeUInt16BE(0x4000, 36); // Flags + Fragment Offset (Don't fragment)
+            pkt.writeUInt8(64, 38); // TTL
+            pkt.writeUInt8(6, 39); // Protocol (TCP)
+            pkt.writeUInt16BE(0, 40); // Header Checksum (Dummy)
+            ipToBytes(localIp).copy(pkt, 42); // Src IP
+            ipToBytes(remoteIp).copy(pkt, 46); // Dst IP
+            
+            // 4. TCP Header (20 bytes) [Offset 50]
+            pkt.writeUInt16BE(localPort, 50); // Src Port
+            pkt.writeUInt16BE(remotePort, 52); // Dst Port
+            pkt.writeUInt32BE(Math.floor(Math.random() * 0xffffffff), 54); // Seq Num
+            pkt.writeUInt32BE(Math.floor(Math.random() * 0xffffffff), 58); // Ack Num
+            pkt.writeUInt8(0x50, 62); // Data Offset (5) + Reserved
+            pkt.writeUInt8(0x18, 63); // Flags (PSH, ACK)
+            pkt.writeUInt16BE(8192, 64); // Window Size
+            pkt.writeUInt16BE(0, 66); // Checksum (Dummy)
+            pkt.writeUInt16BE(0, 68); // Urgent Pointer
+            
+            pcapStream.write(pkt);
+          }
+        } catch(e) {
+          console.error('[PCAP] Error generating synthetic packet', e);
+        }
+      }
 
       // Ensure remoteAddr exists and is not local loopback
       if (!remoteAddr || remoteAddr.startsWith('127.0.0.') || remoteAddr.startsWith('192.168.') || remoteAddr.startsWith('[::1]')) return;
@@ -281,6 +477,7 @@ function pollNetwork() {
             // Development & Tools
             'antigravity.exe', 'node.exe', 'code.exe', 'python.exe', 'java.exe', 'javaw.exe', 
             'docker.exe', 'docker-desktop.exe', 'git.exe', 'language_server_windows_x64.exe',
+            'behavioral_engine.exe',
             // Hardware & OEM
             'hp.hpx.exe', 'hpprinterhealthmonitor.exe',
             // Media & Gaming
@@ -314,10 +511,19 @@ function pollNetwork() {
              timestamp: new Date().toISOString()
           };
 
-          // EMIT ALL EVENTS (Let the frontend UI filters handle visibility)
-          addLogToHistory(event);
-          io.emit('leak_event', event);
-          if (isThreat) console.log(`[ALERT] ${appName} -> ${remoteIp} (${geo.country})`);
+          // Action 2 & 3: Generate a unique session signature and gate the event to prevent UI scrolling spam
+          const cleanAppName = appName.replace(/[\[\]]/g, '');
+          const sessionKey = `${cleanAppName}-${remoteIp}`;
+          
+          if (!knownSessions.has(sessionKey)) {
+            knownSessions.set(sessionKey, Date.now());
+            // EMIT ALL EVENTS (Let the frontend UI filters handle visibility)
+            broadcastAndStoreLog(event);
+            if (isThreat) console.log(`[ALERT] ${appName} -> ${remoteIp} (${geo.country})`);
+          } else {
+            // Keep the session alive so it doesn't get pruned while still active
+            knownSessions.set(sessionKey, Date.now());
+          }
         }
       }
     });
@@ -332,9 +538,23 @@ setInterval(() => {
       activeConnectionsMap.delete(key);
     }
   }
+  
+  // Action 4: Session Pruning for knownSessions (60 second TTL)
+  for (let [key, timestamp] of knownSessions.entries()) {
+    if (now - timestamp > 60000) {
+      knownSessions.delete(key);
+    }
+  }
   // Emit updated map size to the UI
   io.emit('active_count', activeConnectionsMap.size);
 }, 5000);
+
+// Throttled endpoint broadcast — fires exactly once per second to prevent WebSocket thread flooding
+setInterval(() => {
+  // If no LAN IPs detected, default to 1 (the local machine itself is always protected)
+  const count = activeEndpoints.size > 0 ? activeEndpoints.size : 1;
+  io.emit('endpoint_count', count);
+}, 1000);
 
 console.log(`\n=================================================`);
 console.log(`🚀 NetGuard OPTIMIZED LIVE SNIFFER STARTED 🚀`);
@@ -351,4 +571,3 @@ try {
   execSync('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings" /v ProxyEnable /t REG_DWORD /d 0 /f');
   console.log('[+] Verified: All experimental Windows proxy intercepts are cleaned/removed.');
 } catch(e) {}
-

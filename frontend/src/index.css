@@ -1205,3 +1205,74 @@ h1, h2, h3, h4, .mono {
 .download-log-btn:active {
   transform: translateY(0);
 }
+
+/* ═══════════════════════════════════════════
+   MARKDOWN & MERMAID STYLES
+═══════════════════════════════════════════ */
+.markdown-body {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: #e2e8f0;
+}
+
+.markdown-body p {
+  margin-bottom: 8px;
+}
+.markdown-body p:last-child {
+  margin-bottom: 0;
+}
+
+.markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4 {
+  color: var(--accent-cyan);
+  margin-top: 12px;
+  margin-bottom: 6px;
+  font-family: 'Share Tech Mono', monospace;
+  text-transform: uppercase;
+}
+.markdown-body h1 { font-size: 1.2rem; }
+.markdown-body h2 { font-size: 1.1rem; }
+.markdown-body h3 { font-size: 1.0rem; }
+
+.markdown-body ul, .markdown-body ol {
+  margin-bottom: 8px;
+  padding-left: 20px;
+}
+
+.markdown-body li {
+  margin-bottom: 4px;
+}
+
+.markdown-body code {
+  font-family: 'Share Tech Mono', monospace;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 2px 4px;
+  border-radius: 4px;
+  color: #38bdf8;
+}
+
+.markdown-body pre {
+  background: rgba(0, 0, 0, 0.5);
+  padding: 10px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin-bottom: 8px;
+  border: 1px solid rgba(56, 189, 248, 0.2);
+}
+
+.markdown-body pre code {
+  background: transparent;
+  padding: 0;
+  color: #e2e8f0;
+}
+
+.mermaid-wrapper {
+  background: rgba(15, 23, 42, 0.6);
+  border-radius: 8px;
+  padding: 10px;
+  margin: 10px 0;
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  display: flex;
+  justify-content: center;
+  overflow-x: auto;
+}

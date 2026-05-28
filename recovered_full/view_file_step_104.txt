@@ -1,0 +1,74 @@
+Created At: 2026-05-28T06:47:45Z
+Completed At: 2026-05-28T06:47:45Z
+File Path: `file:///c:/Users/PRASAD%20DABHEKAR/OneDrive/Documents/NetGuardBharat/frontend/src/App.jsx`
+Total Lines: 1526
+Total Bytes: 67199
+Showing lines 860 to 990
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+860: 
+861:   return (
+862:     <div className="dashboard-container">
+863:       <Toaster position="bottom-right" reverseOrder={false} />
+864:       {/* Background 3D Cyber Globe */}
+865:       <GlobeMap arcsData={displayedArcs} labelsData={uniqueDestinations} focusPoint={focusPoint} />
+866: 
+867:       {/* Floating UI Overlays */}
+868:       <div className="overlay-panels">
+869:         
+870:         {/* Left Side: Stats and Titles */}
+871:         <div className="w-[320px] min-w-[320px] h-screen flex flex-col bg-[#0b1120] border-r border-cyan-900/50 p-4 relative z-10 overflow-hidden">
+872:           
+873:           {/* 1. HEADER - BULLETPROOF TRICOLOR INLINE STYLE */}
+874:           <div className="flex flex-row items-center gap-2 mb-6 shrink-0">
+875:             <span className="text-cyan-400 font-black tracking-widest text-xl">NETGUARD</span>
+876:             <span 
+877:               className="font-black tracking-widest text-xl drop-shadow-md"
+878:               style={{
+879:                 backgroundImage: 'linear-gradient(to right, #FF9933 0%, #FF9933 33.3%, #FFFFFF 33.3%, #FFFFFF 66.6%, #138808 66.6%, #138808 100%)',
+880:                 WebkitBackgroundClip: 'text',
+881:                 WebkitTextFillColor: 'transparent',
+882:                 color: 'transparent'
+883:               }}
+884:             >
+885:               BHARAT
+886:             </span>
+887:           </div>
+888: 
+889:           {/* 2. SCROLLABLE INNER CONTENT (NO RIGHT BORDER ALLOWED) */}
+890:           <div className="flex flex-col gap-6 overflow-y-auto flex-grow min-h
+<truncated 5314 bytes>
+hover:bg-cyan-500/20">
+958:                ~ STEALTH {stealthMode ? 'ON (HIDE SAFE)' : 'OFF'}
+959:              </button>
+960:              <div className="flex flex-row gap-2">
+961:                <button onClick={toggleNoise} className={`border text-xs py-2 rounded flex-1 hover:text-white ${showNoise ? 'border-gray-500/50 bg-gray-700/50 text-white' : 'border-gray-700 bg-gray-900/50 text-gray-400'}`}>
+962:                  ~ NOISE {showNoise ? 'ON' : 'OFF'}
+963:                </button>
+964:                <button onClick={toggleGeo} className="border border-red-500/50 bg-red-500/10 text-red-500 text-xs py-2 rounded flex-1 flex items-center justify-center gap-2 hover:bg-red-500/20">
+965:                  {geofenceIndia && <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>}
+966:                  GEOFENCE {geofenceIndia ? 'IN' : 'ALL'}
+967:                </button>
+968:              </div>
+969:           </div>
+970: 
+971:         </div>
+972: 
+973:         {/* Right Side: Tabbed Panel */}
+974:         <div className="panel sidebar" style={{ display: 'flex', flexDirection: 'column', gap: 0, backdropFilter: isExpanded ? 'none' : 'blur(12px)', WebkitBackdropFilter: isExpanded ? 'none' : 'blur(12px)' }}>
+975: 
+976:           {/* Tab Navigation */}
+977:           <div className="tab-nav">
+978:             {[
+979:               { id: 'copilot', label: '🤖 AI Copilot' },
+980:               { id: 'feed',    label: '⚡ Intel Feed' },
+981:               { id: 'logs',   label: '🖥 Raw Logs' },
+982:             ].map(tab => (
+983:               <button
+984:                 key={tab.id}
+985:                 className={`tab-btn ${activeTab === tab.id ? 'tab-active' : ''}`}
+986:                 onClick={() => setActiveTab(tab.id)}
+987:               >
+988:                 {tab.label}
+989:               </button>
+990:             ))}
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.

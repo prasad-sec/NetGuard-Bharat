@@ -1,0 +1,90 @@
+Created At: 2026-05-28T06:41:36Z
+Completed At: 2026-05-28T06:41:36Z
+File Path: `file:///c:/Users/PRASAD%20DABHEKAR/OneDrive/Documents/NetGuardBharat/README.md`
+Total Lines: 108
+Total Bytes: 6439
+Showing lines 1 to 108
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+1: # 🛡️ NetGuard Bharat
+2: 
+3: NetGuard Bharat is a real-time network monitoring dashboard and data exfiltration visualizer. It monitors outbound socket connections, runs a passive packet-sniffing tap in the background, and maps network traffic dynamically onto an interactive 3D globe. 
+4: 
+5: The project is built to help identify anomalous outbound traffic, track where local processes are sending data, and provide threat mitigation guides.
+6: 
+7: ---
+8: 
+9: ## 🚀 Key Features
+10: 
+11: ### 🌍 Interactive 3D Globe
+12: *   Built with React, Vite, and Three.js.
+13: *   Plots active outbound connections as glowing lines connecting India to target countries based on their destination IPs.
+14: *   Includes automatic performance capping (rendering a maximum of 30 active arcs at a time) to avoid browser lag.
+15: 
+16: ### 📡 Real-Time Socket Monitoring & Express Backend
+17: *   A lightweight Node.js server that polls current socket connections using native OS tools (`netstat` and `tasklist`).
+18: *   Maps active connection PIDs to executable application names, using a 5-second process name cache to minimize CPU usage.
+19: *   Streams socket data in real time via Socket.IO to the client dashboard.
+20: *   Exposes an `/api/alert` POST route to receive and display behavioral flags from external network taps.
+21: 
+22: ### 💾 SQLite Telemetry Persistence & Dynamic Retention
+23: *   **Persistent SQLite DB**: Transitions the application from a stateless frontend visualizer to a stateful enterprise dashboard, storing telemetry in `netguard_telemetry.db`.
+24: *   **3
+<truncated 3318 bytes>
+pelines, identifies conversational greetings to bypass log analysis, and evaluates threats using a 50-log sliding context window.
+53: 
+54: ---
+55: 
+56: ## 🛠️ Getting Started
+57: 
+58: ### 💻 1. Run the Dashboard & Express Backend
+59: You need two terminals:
+60: ```bash
+61: # Terminal 1: Run the backend
+62: cd proxy-server
+63: node server.js
+64: ```
+65: 
+66: ```bash
+67: # Terminal 2: Run the React app
+68: cd frontend
+69: npm run dev
+70: ```
+71: Open `http://localhost:5173` in your browser.
+72: 
+73: ### ⚙️ 2. Run the Packet Sniffer (Python)
+74: Because the Python script sniffs raw network packets in promiscuous mode, **you must run it with Administrator privileges**:
+75: 1. Open PowerShell or Command Prompt as **Administrator**.
+76: 2. Navigate to the backend folder:
+77:    ```cmd
+78:    cd backend
+79:    ```
+80: 3. Start the tap:
+81:    ```cmd
+82:    python enterprise_tap.py
+83:    ```
+84: 4. (Optional) Run the analyzer engine in another terminal to forward alerts to the dashboard:
+85:    ```cmd
+86:    python behavioral_engine.py
+87:    ```
+88: 
+89: ### 🧠 3. AI Copilot Setup (Local & Cloud)
+90: To enable the interactive chatbot, you may configure the Local engine, the Cloud engine, or both.
+91: 
+92: **For Local Edge Inference (Ollama):**
+93: 1. Install **[Ollama](https://ollama.com/)** on your host system.
+94: 2. Download and initialize the local model:
+95:    ```bash
+96:    ollama run llama3.2:1b
+97:    ```
+98: 
+99: **For Cloud Inference (Gemini):**
+100: 1. Generate a Gemini API Key via Google AI Studio.
+101: 2. Create a `.env` configuration file within the `proxy-server` directory.
+102: 3. Define the environment variable as follows:
+103:    ```env
+104:    GEMINI_API_KEY="your-api-key-here"
+105:    ```
+106: 
+107: *Note: The frontend dashboard operates independently with the Node backend (`server.js`). The Python packet tap and AI inference engines are modular extensions designed for advanced behavioral analysis.*
+108: 
+The above content shows the entire, complete file contents of the requested file.

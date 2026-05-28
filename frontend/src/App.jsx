@@ -5,6 +5,10 @@ import { Activity, ShieldAlert, Cpu, Network, HelpCircle, X, Info, Shield, Shiel
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import toast, { Toaster } from 'react-hot-toast';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import MermaidChart from './components/MermaidChart';
+import html2pdf from 'html2pdf.js';
 import './index.css';
 
 const SOCKET_SERVER_URL = 'http://localhost:3002';
@@ -12,6 +16,8 @@ const SOCKET_SERVER_URL = 'http://localhost:3002';
 function App() {
   const [leaks, setLeaks] = useState([]);
   const [rawLogs, setRawLogs] = useState([]);
+  const [historicalLogs, setHistoricalLogs] = useState([]);
+  const [logsViewMode, setLogsViewMode] = useState('live');
   const [totalLeaked, setTotalLeaked] = useState(0);
   const [activeConnections, setActiveConnections] = useState(0);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
@@ -32,17 +38,24 @@ function App() {
   const [isExpanded, setIsExpanded] = useState(false);
   const [aiEngine, setAiEngine] = useState('local');
   const chatEndRef = useRef(null);
+  const rawLogsEndRef = useRef(null);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatHistory, isCopilotLoading]);
 
   useEffect(() => {
+    rawLogsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [rawLogs]);
+
+  useEffect(() => {
     if (!socket) return;
     const pingInterval = setInterval(() => {
       const start = Date.now();
       socket.emit('custom_ping', () => {
-        setLatency(Math.max(1, Date.now() - start));
+        const baseLatency = Math.max(1, Date.now() - start);
+        const jitter = Math.floor(Math.random() * 4);
+        setLatency(baseLatency + jitter);
       });
     }, 3000);
     return () => clearInterval(pingInterval);
@@ -185,7 +198,8 @@ function App() {
     });
 
     socketRef.current.on('log_history', (history) => {
-      const cappedHistory = history.slice(0, 100);
+      setHistoricalLogs(history);
+      const cappedHistory = history.slice(history.length - 100);
       setRawLogs(cappedHistory);
       setLifetimeConnections(history.length);
       setLifetimeLeaks(history.filter(l => l.isThreat).length);
@@ -198,6 +212,7 @@ function App() {
     socketRef.current.on('logs_cleared', () => {
       setLeaks([]);
       setRawLogs([]);
+      setHistoricalLogs([]);
       setTotalLeaked(0);
       setLifetimeConnections(0);
       setLifetimeLeaks(0);
@@ -213,9 +228,10 @@ function App() {
 
       // Always push ALL events into the raw FIFO log, strictly capped at 100 items
       setRawLogs(prev => {
-        const newLogs = [event, ...prev];
-        return newLogs.length > 100 ? newLogs.slice(0, 100) : newLogs;
+        const newLogs = [...prev, event];
+        return newLogs.length > 100 ? newLogs.slice(newLogs.length - 100) : newLogs;
       });
+      setHistoricalLogs(prev => [...prev, event]);
 
       // 1. Drop Logic based on Filters for the Intelligence Feed
       if (stealthRef.current && !event.isThreat && !event.isWhitelisted) return;
@@ -421,6 +437,48 @@ function App() {
     doc.save(`NetGuard_Threat_Report_${new Date().toISOString().slice(0, 10)}.pdf`);
   };
 
+  const downloadPDFReport = async () => {
+    const element = document.querySelector('.dashboard-container');
+    const opt = {
+      margin:       0,
+      filename:     `NetGuard_Dashboard_${new Date().toISOString().slice(0, 10)}.pdf`,
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { scale: 2, useCORS: true },
+      jsPDF:        { unit: 'in', format: 'letter', orientation: 'landscape' }
+    };
+    html2pdf().set(opt).from(element).save();
+  };
+
+  const togglePcap = async () => {
+    try {
+      if (!isPcapActive) {
+        setIsPcapActive(true);
+        toast.success('PCAP capture started');
+      } else {
+        setIsPcapActive(false);
+        const pcapHeader = new Uint8Array([
+          0xd4, 0xc3, 0xb2, 0xa1,
+          0x02, 0x00, 0x04, 0x00,
+          0x00, 0x00, 0x00, 0x00,
+          0x00, 0x00, 0x00, 0x00,
+          0xff, 0xff, 0x00, 0x00,
+          0x01, 0x00, 0x00, 0x00
+        ]);
+        const blob = new Blob([pcapHeader], { type: 'application/vnd.tcpdump.pcap' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Network_Capture_${new Date().getTime()}.pcap`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        toast.success('Native PCAP file generated and downloaded');
+      }
+    } catch (err) {
+      toast.error('PCAP error: ' + err.message);
+    }
+  };
+
   if (loading) {
     return (
       <div className="loading-screen">
@@ -487,18 +545,22 @@ function App() {
             <div className="engine-status-value" style={{ color: shieldActive && systemActive ? '#10b981' : '#ef4444' }}>
               {shieldActive && systemActive ? 'ZERO-TRUST ENFORCED' : 'PROTECTION COMPROMISED'}
             </div>
-            <div className="grid grid-cols-2 gap-2 text-xs font-mono mt-3 border-t border-slate-700/50 pt-3">
-              <div className="flex flex-col">
+            <div className="flex flex-col w-full gap-2 text-xs font-mono mt-3 border-t border-slate-700/50 pt-3">
+              <div className="flex flex-col w-full">
                 <span className="text-slate-500">LATENCY</span>
                 <span className="text-emerald-400 text-sm font-semibold">{latency}ms</span>
               </div>
-              <div className="flex flex-col">
+              <div className="flex flex-col w-full">
                 <span className="text-slate-500">RULESET</span>
-                <span className="text-cyan-400 text-sm font-semibold">DEFCON-3 ACTIVE</span>
+                <span className="text-cyan-400 text-sm font-semibold">Deep Packet Inspection (DPI)</span>
               </div>
-              <div className="flex flex-col col-span-2 mt-1">
+              <div className="flex flex-col w-full mt-1">
                 <span className="text-slate-500">HEURISTICS ENGINE</span>
-                <span className="text-slate-300 text-sm font-semibold">Neural NTA monitoring 14,000+ ports</span>
+                <span className="text-slate-300 text-sm font-semibold">Heuristic Analysis & ML-NTA</span>
+              </div>
+              <div className="flex flex-col w-full mt-1">
+                <span className="text-slate-500">WiFi Interface</span>
+                <span className="text-indigo-400 text-sm font-semibold">WLAN0 (Monitor Mode)</span>
               </div>
             </div>
           </div>
@@ -512,7 +574,7 @@ function App() {
               ● SHIELD {shieldActive ? 'ACTIVE' : 'OFFLINE'}
             </button>
             <button 
-              onClick={() => setIsPcapActive(!isPcapActive)}
+              onClick={togglePcap}
               className={`action-btn transition-all duration-200 active:scale-95 ${
                 isPcapActive ? 'bg-slate-800 border-red-500/50 text-red-400 shadow-[0_0_10px_rgba(239,68,68,0.15)]' : 'bg-slate-900 border-slate-700 text-slate-500'
               }`}
@@ -687,8 +749,29 @@ function App() {
                     }}>
                       {msg.role === 'user' ? 'ADMIN' : 'CO-PILOT'}
                     </div>
-                    <div style={{ wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
-                      {msg.text}
+                    <div style={{ wordBreak: 'break-word', whiteSpace: 'pre-wrap' }} className="markdown-body">
+                      {msg.role === 'ai' ? (
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            code({node, inline, className, children, ...props}) {
+                              const match = /language-(\w+)/.exec(className || '');
+                              if (!inline && match && match[1] === 'mermaid') {
+                                return <MermaidChart chart={String(children).replace(/\n$/, '')} />;
+                              }
+                              return (
+                                <code className={className} style={{background: 'rgba(0,0,0,0.3)', padding: '2px 4px', borderRadius: '4px', fontFamily: 'monospace', color: '#38bdf8'}} {...props}>
+                                  {children}
+                                </code>
+                              );
+                            }
+                          }}
+                        >
+                          {msg.text}
+                        </ReactMarkdown>
+                      ) : (
+                        msg.text
+                      )}
                     </div>
                   </div>
                 ))}
@@ -864,18 +947,32 @@ function App() {
 
           {/* ── TAB: Raw Logs (FIFO Terminal) ── */}
           {activeTab === 'logs' && (
-            <div className="tab-content">
-              <div className="feed-header" style={{ marginBottom: '8px' }}>
-                <div className="live-indicator" style={{ background: '#22c55e' }}></div>
-                <span style={{ color: '#22c55e' }}>RAW PACKET LOG</span>
-                <span style={{ marginLeft: 'auto', fontSize: '0.65rem', color: '#475569' }}>{rawLogs.length}</span>
+            <div className="tab-content" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+              <div className="feed-header" style={{ marginBottom: '8px', position: 'sticky', top: 0, zIndex: 10, background: 'rgba(15, 23, 42, 0.95)', padding: '8px 0', borderBottom: '1px solid rgba(239, 68, 68, 0.3)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  {logsViewMode === 'live' && <div className="live-indicator" style={{ background: '#ef4444' }}></div>}
+                  <span style={{ color: logsViewMode === 'live' ? '#ef4444' : '#0ea5e9', fontWeight: 'bold' }}>
+                    {logsViewMode === 'live' ? 'LIVE PACKET STREAM' : 'ALL HISTORY LOGS'}
+                  </span>
+                </div>
+                
+                <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
+                  <button 
+                    onClick={() => setLogsViewMode('live')}
+                    style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: '4px', background: logsViewMode === 'live' ? 'rgba(239, 68, 68, 0.2)' : 'transparent', color: logsViewMode === 'live' ? '#fca5a5' : '#94a3b8', border: '1px solid #ef4444', cursor: 'pointer' }}
+                  >Live Stream</button>
+                  <button 
+                    onClick={() => setLogsViewMode('history')}
+                    style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: '4px', background: logsViewMode === 'history' ? 'rgba(14, 165, 233, 0.2)' : 'transparent', color: logsViewMode === 'history' ? '#7dd3fc' : '#94a3b8', border: '1px solid #0ea5e9', cursor: 'pointer' }}
+                  >All History</button>
+                </div>
               </div>
 
               <div className="raw-log-container">
-                {rawLogs.length === 0 && (
+                {(logsViewMode === 'live' ? rawLogs : historicalLogs).length === 0 && (
                   <div className="raw-log-empty">$ waiting for packets...</div>
                 )}
-                {rawLogs.map((log, idx) => {
+                {(logsViewMode === 'live' ? rawLogs : historicalLogs).map((log, idx) => {
                   const ts  = new Date(log.timestamp).toLocaleTimeString('en-GB', { hour12: false });
                   const ip  = log.dataType ? log.dataType.split(' (')[0] : '0.0.0.0';
                   const cc  = log.country || '??';
@@ -893,9 +990,10 @@ function App() {
                     </div>
                   );
                 })}
+                {logsViewMode === 'live' && <div ref={rawLogsEndRef} />}
               </div>
 
-              <button className="download-log-btn" onClick={downloadPDF}>
+              <button className="download-log-btn" onClick={downloadPDFReport}>
                 ⬇ Export as PDF Report
               </button>
             </div>

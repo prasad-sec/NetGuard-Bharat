@@ -1,0 +1,61 @@
+Created At: 2026-05-28T06:45:56Z
+Completed At: 2026-05-28T06:45:56Z
+File Path: `file:///c:/Users/PRASAD%20DABHEKAR/OneDrive/Documents/NetGuardBharat/frontend/src/App.jsx`
+Total Lines: 1535
+Total Bytes: 67707
+Showing lines 869 to 985
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+869:         
+870:         {/* Left Side: Stats and Titles */}
+871:         <div className="w-[320px] min-w-[320px] max-w-[320px] h-screen flex flex-col bg-[#0b1120] border border-cyan-900/50 p-4 shadow-[0_0_15px_rgba(6,182,212,0.15)] relative z-10">
+872:           
+873:           {/* 1. HEADER - INLINE STYLES (BULLETPROOF TRICOLOR) */}
+874:           <div className="flex flex-row items-center gap-2 mb-6 shrink-0 whitespace-nowrap">
+875:             <span className="text-cyan-400 font-black tracking-widest text-xl">NETGUARD</span>
+876:             <span 
+877:               className="font-black tracking-widest text-xl drop-shadow-md"
+878:               style={{
+879:                 backgroundImage: 'linear-gradient(to right, #FF9933 0%, #FF9933 33.3%, #FFFFFF 33.3%, #FFFFFF 66.6%, #138808 66.6%, #138808 100%)',
+880:                 WebkitBackgroundClip: 'text',
+881:                 backgroundClip: 'text',
+882:                 WebkitTextFillColor: 'transparent',
+883:                 color: 'transparent'
+884:               }}
+885:             >
+886:               BHARAT
+887:             </span>
+888:           </div>
+889: 
+890:           {/* 2. SCROLLABLE INNER CONTENT (MIN-H-0 ENFORCED) */}
+891:           <div 
+892:             className="flex flex-col gap-6 overflow-y-auto overflow-x-hidden pr-2 flex-grow min-h-0"
+893:             style={{ borderRight: 'none' }}
+894:           >
+895:             
+896:             {/* Top Metrics */}
+897:             <div className="flex flex-row gap-4 w-full">
+898:               <div className="flex-1 flex flex-col
+<truncated 4899 bytes>
+           <div className="mt-4 pt-4 border-t border-cyan-500/20 shrink-0 flex flex-col gap-2">
+965:              <span className="text-[10px] text-gray-500 uppercase tracking-widest mb-1">Intelligence Filters</span>
+966:              <button onClick={toggleStealth} className={`border text-xs py-2 rounded w-full transition-colors ${stealthMode ? 'border-cyan-500/50 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20' : 'border-gray-700 bg-gray-900/50 text-gray-400 hover:text-white'}`}>
+967:                ~ STEALTH {stealthMode ? 'ON (HIDE SAFE)' : 'OFF'}
+968:              </button>
+969:              <div className="flex flex-row gap-2">
+970:                <button onClick={toggleNoise} className={`border text-xs py-2 rounded flex-1 transition-colors ${showNoise ? 'border-gray-500/50 bg-gray-700/50 text-white' : 'border-gray-700 bg-gray-900/50 text-gray-400 hover:text-white'}`}>
+971:                  ~ NOISE {showNoise ? 'ON' : 'OFF'}
+972:                </button>
+973:                <button onClick={toggleGeo} className={`border text-xs py-2 rounded flex-1 flex items-center justify-center gap-2 transition-colors ${geofenceIndia ? 'border-red-500/50 bg-red-500/10 text-red-500 hover:bg-red-500/20' : 'border-gray-700 bg-gray-900/50 text-gray-400 hover:text-white'}`}>
+974:                  {geofenceIndia && <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>}
+975:                  GEOFENCE {geofenceIndia ? 'IN' : 'ALL'}
+976:                </button>
+977:              </div>
+978:           </div>
+979: 
+980:         </div>
+981: 
+982:         {/* Right Side: Tabbed Panel */}
+983:         <div className="panel sidebar" style={{ display: 'flex', flexDirection: 'column', gap: 0, backdropFilter: isExpanded ? 'none' : 'blur(12px)', WebkitBackdropFilter: isExpanded ? 'none' : 'blur(12px)' }}>
+984: 
+985:           {/* Tab Navigation */}
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.

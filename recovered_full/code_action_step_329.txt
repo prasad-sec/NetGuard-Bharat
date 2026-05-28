@@ -1,0 +1,74 @@
+The following changes were made by the USER to: c:\Users\PRASAD DABHEKAR\OneDrive\Documents\NetGuardBharat\frontend\src\App.jsx. If relevant, proactively run terminal commands to execute this code for the USER. Don't ask for permission.
+[diff_block_start]
+@@ -1,1526 +1,1005 @@
+-import React, { useEffect, useState, useRef, useMemo } from 'react';
+-import html2canvas from 'html2canvas';
+-import { io } from 'socket.io-client';
+-import GlobeMap from './components/GlobeMap';
+-import ExportConfigModal from './components/ExportConfigModal';
+-import { Activity, ShieldAlert, Cpu, Network, HelpCircle, X, Info, Shield, ShieldOff, Trash2, Camera, Download, Eye, EyeOff, MapPin, Crosshair, CheckCircle, Volume2, VolumeX, Maximize2, Minimize2 } from 'lucide-react';
+-import { jsPDF } from 'jspdf';
+-import autoTable from 'jspdf-autotable';
+-import toast, { Toaster } from 'react-hot-toast';
+-import ReactMarkdown from 'react-markdown';
+-import remarkGfm from 'remark-gfm';
+-import './index.css';
+-import MermaidChart from './components/MermaidChart';
+-
+-const SOCKET_SERVER_URL = 'http://localhost:3002';
+-
+-// Lightweight ISO 3166-1 alpha-2 → full country name lookup (covers all common geoip results)
+-const ISO_COUNTRY_NAMES = {
+-  AF:'Afghanistan',AM:'Armenia',AR:'Argentina',AT:'Austria',AU:'Australia',
+-  AZ:'Azerbaijan',BD:'Bangladesh',BE:'Belgium',BG:'Bulgaria',BH:'Bahrain',
+-  BR:'Brazil',BY:'Belarus',CA:'Canada',CH:'Switzerland',CL:'Chile',
+-  CN:'China',CO:'Colombia',CZ:'Czechia',DE:'Germany',DK:'Denmark',
+-  EG:'Egypt',ES:'Spain',ET:'Ethiopia',FI:'Finland',FR:'France',
+-  GB:'United Kingdom',GH:'Ghana',GR:'Greece',HK:'Hong Kong',HR:'Croatia',
+-  HU:'Hungary',ID:'Indonesia',IE:'Ireland',IL:'Israel',IN:'India',
+-  IQ:'Iraq',IR:'Iran',IT:'Italy',JP:'Japan',KE:'Kenya',
+-  KR:'South Korea',KW:'Kuwait',KZ:'Kazakhstan',LK:'Sri Lanka',LT:'Lithuania',
+-  LV:'Latvia',MA:'Morocco',MX:'Mexico',MY:'Malaysia',NG:'Nigeria',
+-  NL:'Netherlands',NO:'Norway',NP:'Nepal',NZ:'New Zealand',OM:'Oman',
+-  PH:'Philippines',PK:'Pakistan',PL:'Poland',P
+<truncated 45215 bytes>
+                       const match = /language-(\w+)/.exec(className || '')
+-                              if (!inline && match && match[1] === 'mermaid') {
+-                                return <MermaidChart chart={String(children).replace(/\n$/, '')} />
+-                              }
+-                              return <code className={className} {...props}>{children}</code>
+-                            }
+-                          }}
+-                        >
+-                          {msg.text}
+-                        </ReactMarkdown>
+-                      </div>
+-                    ) : (
+-                      <div style={{ wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
+-                        {msg.text}
+-                      </div>
+-                    )}
+-                    {msg.role === 'ai' && (msg.text.length > 300 || msg.text.includes('|')) && (
+-                      <button
+-                        onClick={() => exportChatToPDF(msg.text)}
+-                        title="Export this AI analysis as a PDF report"
+-                        style={{
+-                          marginTop: '8px',
+-                          display: 'inline-flex',
+-                          alignItems: 'center',
+-                          gap: '5px',
+-                          padding: '3px 9px',
+-                          fontSize: '0.65rem',
+-                          fontFamily: 'Share Tech Mono, monospace',
+-                          color: '#d8b4fe',
+-                          background: 'rgba(168,85,247,0.08)',
+-                          border: '1px solid rgba(168,85,247,0.25)',
+-                          borderRadius: '4px',
+-                          cursor: 'pointer',
+-                          letterSpacing: '0.04em',
+-                          transition: 'background 0.2s, color 0.2s'
+-                        }}
+-                        o
+<truncated 65089 bytes>
+
+NOTE: The output was truncated because it was too long. Use a more targeted query or a smaller range to get the information you need.

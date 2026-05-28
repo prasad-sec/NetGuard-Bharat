@@ -1,0 +1,112 @@
+<USER_REQUEST>
+require('dotenv').config();
+const { GoogleGenerativeAI } = require("@google/generative-ai");
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const { exec } = require('child_process');
+const geoip = require('geoip-lite');
+const { Server } = require('socket.io');
+const express = require('express');
+const http = require('http');
+const cors = require('cors');
+const fs = require('fs');
+const path = require('path');
+
+// Ensure exports directory exists
+const exportsDir = path.join(__dirname, 'exports');
+if (!fs.existsSync(exportsDir)) {
+  fs.mkdirSync(exportsDir);
+}
+
+let isPcapRecording = false;
+let pcapStream = null;
+let currentPcapFilename = null;
+
+const sqlite3 = require('sqlite3').verbose();
+const SOCKET_PORT = 3002;
+
+const app = express();
+
+const db = new sqlite3.Database('./netguard_telemetry.db', (err) => {
+  if (err) console.error("SQLite connection error:", err);
+  else {
+    db.run(`CREATE TABLE IF NOT EXISTS logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      timestamp TEXT,
+      process TEXT,
+      target_ip TEXT,
+      country TEXT,
+      severity TEXT,
+      threat TEXT
+    )`, () => {
+      const pruneDatabase = () => {
+        db.run(`DELETE FROM logs WHERE timestamp < datetime('now', '-7 days')`, function(err) {
+          if (err) console.error("[DB] Pruning error:", err);
+          else console.log(`[DB] Pruned ${this.changes} old logs from SQLite to enforce 7-day edge retention.`);
+        });
+      };
+      pruneDatabase();
+      setInterval(pruneDatabase, 24 * 60 * 60 * 1000);
+    });
+  }
+});
+const corsOptions = {
+  origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
+  methods: ['GET', 'POST'],
+  allowedHeaders: ['Content-Type']
+};
+app.use(cors(corsOptions));
+app.use(express.json()); // Parse JSON bodies
+
+const server = http.createServer(app);
+
+const io = new Server(server, {
+  cors: { origin: '*' }
+});
+
+const logHistory = [];
+
+function addLogToHistory(event) {
+  logHistory.push(event);
+<truncated 21036 bytes>
+);
+}, 5000);
+
+// Throttled endpoint broadcast — fires exactly once per second to prevent WebSocket thread flooding
+setInterval(() => {
+  // If no LAN IPs detected, default to 1 (the local machine itself is always protected)
+  const count = activeEndpoints.size > 0 ? activeEndpoints.size : 1;
+  io.emit('endpoint_count', count);
+}, 1000);
+
+console.log(`\n=================================================`);
+console.log(`🚀 NetGuard OPTIMIZED LIVE SNIFFER STARTED 🚀`);
+console.log(`=================================================`);
+console.log(`[!] Passively scanning system network activity...`);
+console.log(`[!] Optimized: Process caching (5s) enabled for real-time feed.`);
+
+// Poll connections every 1 second
+setInterval(pollNetwork, 1000);
+
+// We still disable any leftover old registry proxy on start just in case it was there
+try {
+  const { execSync } = require('child_process');
+  execSync('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings" /v ProxyEnable /t REG_DWORD /d 0 /f');
+  console.log('[+] Verified: All experimental Windows proxy intercepts are cleaned/removed.');
+} catch(e) {}
+
+
+i think this one is server.js edited yesterday 
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-05-28T13:10:32+05:30.
+
+The user's current state is as follows:
+Active Document: c:\Users\PRASAD DABHEKAR\OneDrive\Documents\NetGuardBharat\frontend\src\App.jsx (LANGUAGE_JAVASCRIPT)
+Cursor is on line: 1
+Other open documents:
+- c:\Users\PRASAD DABHEKAR\OneDrive\Documents\NetGuardBharat\frontend\src\App.jsx (LANGUAGE_JAVASCRIPT)
+- c:\Users\PRASAD DABHEKAR\OneDrive\Documents\NetGuardBharat\README.md (LANGUAGE_MARKDOWN)
+- c:\Users\PRASAD DABHEKAR\OneDrive\Documents\NetGuardBharat\network_baseline.log (LANGUAGE_UNSPECIFIED)
+- c:\Users\PRASAD DABHEKAR\OneDrive\Documents\NetGuardBharat\dev_log.md (LANGUAGE_MARKDOWN)
+- c:\Users\PRASAD DABHEKAR\OneDrive\Documents\NetGuardBharat\frontend\src\components\MermaidChart.jsx (LANGUAGE_JAVASCRIPT)
+</ADDITIONAL_METADATA>

@@ -39,6 +39,26 @@ const GlobeMap = ({ arcsData, focusPoint }) => {
     }
   }, [focusPoint]);
 
+  const uniqueLabels = [];
+  const seenCountries = new Set();
+  const regionNames = new Intl.DisplayNames(['en'], { type: 'region' });
+
+  arcsData.forEach(d => {
+    if (!seenCountries.has(d.country) && d.country !== 'Unknown') {
+      seenCountries.add(d.country);
+      let fullName = d.country;
+      try {
+        if (d.country.length === 2) {
+          fullName = regionNames.of(d.country);
+        }
+      } catch (e) {}
+      uniqueLabels.push({ lat: d.endLat, lng: d.endLng, text: fullName });
+    }
+  });
+
+  // Inject host origin label
+  uniqueLabels.push({ lat: 20.5937, lng: 78.9629, text: 'India' });
+
   return (
     <div className="globe-container">
       <Globe
@@ -59,7 +79,15 @@ const GlobeMap = ({ arcsData, focusPoint }) => {
         arcDashGap={1}
         arcDashInitialGap={() => Math.random()}
         arcDashAnimateTime={2000}
-        arcsTransitionDuration={0} // No transition for instantaneous lasers
+        arcsTransitionDuration={0}
+        labelsData={uniqueLabels}
+        labelLat={d => d.lat}
+        labelLng={d => d.lng}
+        labelText={d => d.text}
+        labelSize={1.2}
+        labelDotRadius={0.5}
+        labelColor={() => 'white'}
+        labelResolution={2}
       />
     </div>
   );
