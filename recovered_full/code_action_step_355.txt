@@ -1,4 +1,0 @@
-Created At: 2026-05-28T07:43:24Z
-Completed At: 2026-05-28T07:43:26Z
-Created file file:///c:/Users/PRASAD%20DABHEKAR/OneDrive/Documents/NetGuardBharat/frontend/src/App.jsx with requested content.
-If relevant, proactively run terminal commands to execute this code for the USER. Don't ask for permission.

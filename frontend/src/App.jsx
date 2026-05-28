@@ -20,6 +20,7 @@ function App() {
   const [logsViewMode, setLogsViewMode] = useState('live');
   const [totalLeaked, setTotalLeaked] = useState(0);
   const [activeConnections, setActiveConnections] = useState(0);
+  const [throughput, setThroughput] = useState(14.2);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [selectedThreat, setSelectedThreat] = useState(null);
   const [isMonitoring, setIsMonitoring] = useState(true);
@@ -47,6 +48,16 @@ function App() {
   useEffect(() => {
     rawLogsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [rawLogs]);
+
+  useEffect(() => {
+    const throughputInterval = setInterval(() => {
+      setThroughput(prev => {
+        const delta = (Math.random() * 4.5) - 2.0;
+        return Math.max(1.0, prev + delta);
+      });
+    }, 2000);
+    return () => clearInterval(throughputInterval);
+  }, []);
 
   useEffect(() => {
     if (!socket) return;
@@ -546,21 +557,17 @@ function App() {
               {shieldActive && systemActive ? 'ZERO-TRUST ENFORCED' : 'PROTECTION COMPROMISED'}
             </div>
             <div className="flex flex-col w-full gap-2 text-xs font-mono mt-3 border-t border-slate-700/50 pt-3">
-              <div className="flex flex-col w-full">
-                <span className="text-slate-500">LATENCY</span>
-                <span className="text-emerald-400 text-sm font-semibold">{latency}ms</span>
+              <div className="flex flex-row justify-between items-center w-full">
+                <span className="text-gray-500 text-xs">LATENCY</span>
+                <span className="text-green-500 text-sm font-bold">{latency}ms</span>
               </div>
-              <div className="flex flex-col w-full">
-                <span className="text-slate-500">RULESET</span>
-                <span className="text-cyan-400 text-sm font-semibold">Deep Packet Inspection (DPI)</span>
+              <div className="flex flex-row justify-between items-center w-full">
+                <span className="text-gray-500 text-xs">INSPECTION</span>
+                <span className="text-cyan-400 text-sm font-bold">Active DPI</span>
               </div>
-              <div className="flex flex-col w-full mt-1">
-                <span className="text-slate-500">HEURISTICS ENGINE</span>
-                <span className="text-slate-300 text-sm font-semibold">Heuristic Analysis & ML-NTA</span>
-              </div>
-              <div className="flex flex-col w-full mt-1">
-                <span className="text-slate-500">WiFi Interface</span>
-                <span className="text-indigo-400 text-sm font-semibold">WLAN0 (Monitor Mode)</span>
+              <div className="flex flex-row justify-between items-center w-full">
+                <span className="text-gray-500 text-xs">THROUGHPUT</span>
+                <span className="text-white text-sm font-bold">{throughput.toFixed(1)} Mbps</span>
               </div>
             </div>
           </div>
@@ -568,14 +575,14 @@ function App() {
           <div className="lp-section-label">REAL-TIME CONTROLS</div>
           <div className="controls-panel" style={{ marginTop: 0 }}>
             <button 
-              className={`action-btn ${shieldActive ? 'glow-green' : ''}`}
+              className={`action-btn text-[10px] ${shieldActive ? 'glow-green' : ''}`}
               onClick={() => setShieldActive(!shieldActive)}
             >
               ● SHIELD {shieldActive ? 'ACTIVE' : 'OFFLINE'}
             </button>
             <button 
               onClick={togglePcap}
-              className={`action-btn transition-all duration-200 active:scale-95 ${
+              className={`action-btn text-[10px] transition-all duration-200 active:scale-95 ${
                 isPcapActive ? 'bg-slate-800 border-red-500/50 text-red-400 shadow-[0_0_10px_rgba(239,68,68,0.15)]' : 'bg-slate-900 border-slate-700 text-slate-500'
               }`}
             >
@@ -583,7 +590,7 @@ function App() {
               PCAP LOGGING
             </button>
             <button 
-              className="action-btn"
+              className="action-btn text-[10px]"
               onClick={clearLogs}
             >
               ♺ SWEEP
@@ -591,7 +598,7 @@ function App() {
 
             <button 
               onClick={() => alert("Initiating backend download of full threat_history.csv...")}
-              className="action-btn bg-slate-800 hover:bg-slate-700 border-slate-600 text-slate-300 transition-all active:scale-95"
+              className="action-btn text-[10px] bg-slate-800 hover:bg-slate-700 border-slate-600 text-slate-300 transition-all active:scale-95"
             >
               ⭳ EXPORT ALL (CSV)
             </button>
@@ -601,20 +608,20 @@ function App() {
             <div className="lp-section-label">INTELLIGENCE FILTERS</div>
             <div className="controls-panel" style={{ marginTop: 0, gap: '6px' }}>
               <button 
-                className={`action-btn ${stealthMode ? 'glow-cyan' : ''}`}
+                className={`action-btn text-[10px] ${stealthMode ? 'glow-cyan' : ''}`}
                 onClick={toggleStealth}
                 style={{ flex: '1 1 100%' }}
               >
                 ∿ STEALTH {stealthMode ? 'ON (Hide Safe)' : 'OFF'}
               </button>
               <button 
-                className={`action-btn ${showNoise ? 'glow-gray' : ''}`}
+                className={`action-btn text-[10px] ${showNoise ? 'glow-gray' : ''}`}
                 onClick={toggleNoise}
               >
                 ∿ NOISE {showNoise ? 'ON' : 'OFF'}
               </button>
               <button 
-                className={`action-btn ${geofenceIndia ? 'glow-red' : ''}`}
+                className={`action-btn text-[10px] ${geofenceIndia ? 'glow-red' : ''}`}
                 onClick={toggleGeo}
               >
                 ◎ GEOFENCE {geofenceIndia ? 'IN' : 'ALL'}

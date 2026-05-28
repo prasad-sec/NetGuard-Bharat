@@ -62,3 +62,8 @@ The system consists of three main components:
 *   **Memory Leak Resolution**: Resolved an unbounded accumulation bug within the backend connection tracker. Migrated the stateless counter to a timestamp-driven `activeConnectionsMap`, and deployed a 5-second garbage collection cycle to prune socket data exceeding a 30-second TTL.
 *   **CSS Stacking Context Fix**: Resolved an issue where the Copilot modal overlay was constrained by the parent container's `backdrop-filter`. The rendering logic was refactored to conditionally disable the filter during expansion, allowing the `position: fixed` architecture to correctly bind to the viewport.
 *   **UI Hierarchy Scaling**: Executed a precision scaling pass on the Left Panel interface, reducing button dimensions and standardizing component gaps to achieve a compact, enterprise-grade aesthetic.
+
+### 📈 Phase 9: Rich Text & Flowcharts in AI Chat
+*   Brought in `react-markdown` and `remark-gfm` so the Copilot's responses actually look good with proper formatting, tables, and lists instead of just plain text blocks.
+*   Added a custom `MermaidChart.jsx` component that catches any code blocks tagged with `mermaid` and renders them live as SVG diagrams using the `mermaid` library.
+*   This lets the AI dynamically draw flowcharts to explain attack paths, break down networking concepts, or map out system architecture on the fly right inside the chat sidebar.

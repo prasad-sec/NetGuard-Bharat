@@ -44,6 +44,7 @@ The project is built to help identify anomalous outbound traffic, track where lo
 *   **Cloud AI (Gemini)**: Integrates the `@google/generative-ai` API utilizing the `gemini-2.5-flash` model for high-speed, comprehensive threat inference.
 *   **Data Privacy Middleware**: Actively intercepts and scrubs raw IP address telemetry, substituting it with `[REDACTED_IP]` on the backend prior to any cloud transmission.
 *   **Dynamic Prompting**: Seamlessly switches inference pipelines, identifies conversational greetings to bypass log analysis, and evaluates threats using a 50-log sliding context window.
+*   **Rich Chat Visualization**: The chat interface formats responses with full Markdown (tables, lists) and renders Mermaid.js diagrams on the fly, allowing the AI to visually map out attack paths or explain network concepts right in the conversation.
 
 ---
 
