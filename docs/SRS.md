@@ -149,14 +149,4 @@ The architecture is designed to accommodate expansions in the future:
 
 NetGuard Bharat is designed as a real-time network monitoring and threat visualization system focused on outbound traffic analysis. By combining basic packet analysis with heuristic machine learning and 3D visualization, it helps users identify and understand potential threats. The modular architecture provides a solid foundation for adding new analysis techniques as the project evolves.
 
----
 
-### UI Screenshots (Placeholders)
-
-> **Dashboard Overview**
-> ![Dashboard Overview](https://via.placeholder.com/800x400.png?text=NetGuard+Bharat+-+Main+Dashboard)
-> *The main dashboard displaying the live 3D globe, active connections, and threat alerts sidebar.*
-
-> **Threat Analysis Report**
-> ![Threat Analysis Report](https://via.placeholder.com/800x400.png?text=Detailed+Threat+Analysis+Panel)
-> *A detailed view of a specific intercepted packet, showing the AI's heuristic breakdown and confidence score.*
