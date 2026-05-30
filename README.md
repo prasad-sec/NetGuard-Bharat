@@ -6,6 +6,21 @@ The project is built to help identify anomalous outbound traffic, track where lo
 
 ---
 
+## 📁 Project Structure
+
+```text
+NetGuard-Bharat/
+├── backend/            # Python network tap and behavioral engine
+├── frontend/           # React 3D globe dashboard
+├── proxy-server/       # Node.js socket orchestration server
+├── docs/               # Architecture diagrams and SRS documentation
+├── .gitignore          # Git ignore rules
+├── LICENSE             # MIT License
+└── README.md           # Project documentation
+```
+
+---
+
 ## 🚀 Key Features
 
 ### 🌍 Interactive 3D Globe
