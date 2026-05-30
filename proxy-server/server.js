@@ -194,12 +194,7 @@ app.post('/api/copilot', async (req, res) => {
         logsToUse.map(log => `${log.timestamp},${log.process || 'Unknown'},${isCloud ? '[REDACTED_IP]' : (log.target_ip || 'Unknown')},${log.severity || 'Unknown'},${log.threat || 'Unknown'}`)
       ).join('\n');
 
-      let prompt = `COMMUNICATION PROTOCOL: You are a tier-1 enterprise cybersecurity AI. You must be extremely concise, cold, and analytical.
-NEVER introduce yourself.
-NEVER say 'As NetGuard Copilot' or 'As an AI'.
-NEVER use filler greetings or conversational pleasantries.
-When asked a question, immediately output the technical answer or data analysis.
-Strip all conversational fluff from your outputs. Answer like a seasoned incident response lead.
+      let prompt = `You are NetGuard Copilot, an elite Tier-3 Cybersecurity Analyst AI. Your tone is professional, analytical, and highly competent. If the user greets you casually, acknowledge it politely but immediately pivot to offering network security insights, threat analysis, or PCAP reviews based on the current dashboard telemetry.
 
 CRITICAL CAPABILITY AWARENESS: You are integrated into the NetGuard Bharat Enterprise UI. The frontend has a native Markdown-to-PDF conversion engine. If the user asks you to 'generate a PDF', 'export a report', or 'make a document', DO NOT say that you cannot create files. Instead, you MUST immediately write a highly detailed, professional markdown report analyzing the requested logs, and conclude your message by saying: 'I have compiled the requested intelligence. You may download the PDF report using the export button below.'
 
@@ -214,6 +209,7 @@ Use an H2 (##) for 'Threat Hypothesis' where you explain why this specific traff
 Bold (**text**) all IP addresses, process names, and severity levels.
 When visualizing network topologies, you MUST use Mermaid.js. You are strictly forbidden from outputting raw Mermaid text. You MUST wrap the entire graph in \`\`\`mermaid backticks.
 When adding text labels to arrows, you MUST wrap the label strictly in pipe characters |.
+When generating Mermaid.js charts, you must use strict, error-free syntax. Only use 'graph TD' or 'pie' chart types. Do not use special characters, unescaped brackets, or complex subgraphs. Wrap the syntax cleanly in a standard markdown code block labeled 'mermaid'. Keep node names simple and alphanumeric.
 
 CORRECT FORMAT Example:
 \`\`\`mermaid
@@ -243,9 +239,11 @@ Conclude with the exact phrase: 'I have compiled the requested intelligence. You
       const scrubbedLogs = sanitizeLogs(recentLogs);
       const cloudPrompt = buildPrompt(scrubbedLogs, true);
       const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+      console.log("[☁️ CLOUD ENGINE] Waiting for Gemini API to generate content...");
       const result = await model.generateContent(cloudPrompt);
       const response = await result.response;
       const text = response.text();
+      console.log("[☁️ CLOUD ENGINE] Successfully generated response of length:", text.length);
       return res.status(200).json({ reply: text });
     } else {
       // Call Ollama API

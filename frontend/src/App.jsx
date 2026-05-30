@@ -474,6 +474,25 @@ function App() {
     html2pdf().set(opt).from(element).save();
   };
 
+  const exportCopilotReportPDF = async () => {
+    const element = document.getElementById('copilot-report-container');
+    if (!element) return;
+    const opt = {
+      margin: [0.5, 0.5, 0.5, 0.5],
+      filename: 'NetGuard_Threat_Intelligence.pdf',
+      image: { type: 'jpeg', quality: 1.0 },
+      html2canvas: { 
+        scale: 4, 
+        useCORS: true, 
+        backgroundColor: "#0b1120",
+        windowWidth: 1200 
+      },
+      jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+    };
+    
+    await html2pdf().set(opt).from(element).save();
+  };
+
   const togglePcap = async () => {
     try {
       if (!isPcapActive) {
@@ -731,7 +750,7 @@ function App() {
               </div>
               
               {/* Message Window */}
-              <div style={{
+              <div id="copilot-report-container" style={{
                 flex: 1,
                 overflowY: 'auto',
                 padding: '10px',
@@ -805,16 +824,18 @@ function App() {
                 <div ref={chatEndRef} />
               </div>
 
-              {/* PDF Export Button for AI Copilot */}
-              <div style={{ padding: '4px 0 8px 0' }}>
-                <button 
-                  className="download-log-btn" 
-                  onClick={downloadPDF}
-                  style={{ width: '100%', background: 'rgba(168,85,247,0.15)', borderColor: 'rgba(168,85,247,0.3)', color: '#d8b4fe' }}
-                >
-                  ⬇ Download Threat Report (PDF)
-                </button>
-              </div>
+              {/* PDF Export Button for AI Copilot (Conditional) */}
+              {chatHistory.some(msg => msg.role === 'ai' && msg.text.toLowerCase().includes('pdf')) && (
+                <div style={{ padding: '4px 0 8px 0' }}>
+                  <button 
+                    className="download-log-btn" 
+                    onClick={exportCopilotReportPDF}
+                    style={{ width: '100%', background: 'rgba(168,85,247,0.15)', borderColor: 'rgba(168,85,247,0.3)', color: '#d8b4fe' }}
+                  >
+                    ⬇ Download Threat Report (PDF)
+                  </button>
+                </div>
+              )}
 
               {/* Input Area */}
               <div style={{ display: 'flex', gap: '8px', flexShrink: 0, marginTop: 'auto' }}>
