@@ -1000,7 +1000,7 @@ function App() {
                 {logsViewMode === 'live' && <div ref={rawLogsEndRef} />}
               </div>
 
-              <button className="download-log-btn" onClick={downloadPDFReport}>
+              <button className="download-log-btn" onClick={downloadPDF}>
                 ⬇ Export as PDF Report
               </button>
             </div>
