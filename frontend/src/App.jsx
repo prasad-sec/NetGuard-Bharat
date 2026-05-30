@@ -13,6 +13,20 @@ import './index.css';
 
 const SOCKET_SERVER_URL = 'http://localhost:3002';
 
+const markdownComponents = {
+  code({node, inline, className, children, ...props}) {
+    const match = /language-(\w+)/.exec(className || '');
+    if (!inline && match && match[1] === 'mermaid') {
+      return <MermaidChart chart={String(children).replace(/\n$/, '')} />;
+    }
+    return (
+      <code className={className} style={{background: 'rgba(0,0,0,0.3)', padding: '2px 4px', borderRadius: '4px', fontFamily: 'monospace', color: '#38bdf8'}} {...props}>
+        {children}
+      </code>
+    );
+  }
+};
+
 function App() {
   const [leaks, setLeaks] = useState([]);
   const [rawLogs, setRawLogs] = useState([]);
@@ -760,19 +774,7 @@ function App() {
                       {msg.role === 'ai' ? (
                         <ReactMarkdown
                           remarkPlugins={[remarkGfm]}
-                          components={{
-                            code({node, inline, className, children, ...props}) {
-                              const match = /language-(\w+)/.exec(className || '');
-                              if (!inline && match && match[1] === 'mermaid') {
-                                return <MermaidChart chart={String(children).replace(/\n$/, '')} />;
-                              }
-                              return (
-                                <code className={className} style={{background: 'rgba(0,0,0,0.3)', padding: '2px 4px', borderRadius: '4px', fontFamily: 'monospace', color: '#38bdf8'}} {...props}>
-                                  {children}
-                                </code>
-                              );
-                            }
-                          }}
+                          components={markdownComponents}
                         >
                           {msg.text}
                         </ReactMarkdown>
