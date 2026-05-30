@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import mermaid from 'mermaid';
 
-mermaid.initialize({ startOnLoad: false, theme: 'dark' });
+mermaid.initialize({ startOnLoad: false, theme: 'dark', suppressErrorRendering: true });
 
 const MermaidChart = React.memo(({ chart }) => {
   const containerRef = useRef(null);

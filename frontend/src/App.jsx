@@ -805,6 +805,17 @@ function App() {
                 <div ref={chatEndRef} />
               </div>
 
+              {/* PDF Export Button for AI Copilot */}
+              <div style={{ padding: '4px 0 8px 0' }}>
+                <button 
+                  className="download-log-btn" 
+                  onClick={downloadPDF}
+                  style={{ width: '100%', background: 'rgba(168,85,247,0.15)', borderColor: 'rgba(168,85,247,0.3)', color: '#d8b4fe' }}
+                >
+                  ⬇ Download Threat Report (PDF)
+                </button>
+              </div>
+
               {/* Input Area */}
               <div style={{ display: 'flex', gap: '8px', flexShrink: 0, marginTop: 'auto' }}>
                 <input
