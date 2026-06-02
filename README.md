@@ -1,4 +1,5 @@
 # 🛡️ NetGuard Bharat
+Developed by: Prasad Prashant Dabhekar
 
 NetGuard Bharat is a real-time network monitoring dashboard and data exfiltration visualizer. It monitors outbound socket connections, runs a passive packet-sniffing tap in the background, and maps network traffic dynamically onto an interactive 3D globe. 
 
@@ -16,7 +17,10 @@ The project is built to help identify anomalous outbound traffic, track where lo
 *   Includes automatic performance capping (rendering a maximum of 30 active arcs at a time) to avoid browser lag.
 
 ### 📡 Real-Time Socket Monitoring & Express Backend
-*   A lightweight Node.js server that polls current socket connections using native OS tools (`netstat` and `tasklist`).
+*   A lightweight Node.js server (`server.js`) that polls current socket connections using native OS tools (`netstat` and `tasklist`).
+*   A standalone Local Network Scanner API (`endpoint_server.js`) that maps the host machine's Windows ARP table via `arp -a` to serve live endpoint telemetry.
+*   **Infrastructure Classification**: Dynamically classifies discovered network nodes (Router, Gateway, Client) and tags them with visually distinct badges and device icons (📡, 💻, 📱).
+*   **Aggressive Auto-Polling**: The React dashboard aggressively polls the Scanner API every 3 seconds to instantly visualize connected and disconnected devices without manual refreshes.
 *   Maps active connection PIDs to executable application names, using a 5-second process name cache to minimize CPU usage.
 *   Streams socket data in real time via Socket.IO to the client dashboard.
 *   Exposes an `/api/alert` POST route to receive and display behavioral flags from external network taps.
@@ -35,6 +39,7 @@ The project is built to help identify anomalous outbound traffic, track where lo
 ### 📄 Threat Report Exporter
 *   Generates clean, professional PDF reports on-demand using `jsPDF` and `jspdf-autotable`.
 *   Includes a soft-white readable background with premium dark slate text, mapped full country names, automated tricolour accent margins, and styled dynamic row badges highlighting active threats.
+*   **Unified Telemetry Table**: Combines live active endpoint nodes and historical network socket logs into a single, comprehensive tracking table with 6 strict columns (including Source IP mapping).
 *   Enforces accurate, localized timestamps and strict reverse-chronological sorting to guarantee complete log fidelity.
 
 ### 🐍 Packet Capture & Behavioral Analysis
@@ -53,16 +58,28 @@ The project is built to help identify anomalous outbound traffic, track where lo
 
 ## 🛠️ Getting Started
 
+### 📶 0. Enable Windows Mobile Hotspot (Live Demo Requirement)
+To accurately monitor external endpoints (like mobile devices or secondary laptops), you must turn on the Windows Mobile Hotspot:
+1. Open Windows Settings -> Network & Internet -> Mobile Hotspot.
+2. Toggle **Share my Internet connection** to **On**.
+3. Connect your test device (e.g., your smartphone) to the hotspot network.
+
 ### 💻 1. Run the Dashboard & Express Backend
-You need two terminals:
+You need three terminals:
 ```bash
-# Terminal 1: Run the backend
+# Terminal 1: Run the main backend
 cd proxy-server
 node server.js
 ```
 
 ```bash
-# Terminal 2: Run the React app
+# Terminal 2: Run the Local Network Scanner
+cd proxy-server
+node endpoint_server.js
+```
+
+```bash
+# Terminal 3: Run the React app
 cd frontend
 npm run dev
 ```

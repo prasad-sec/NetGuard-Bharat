@@ -1,4 +1,5 @@
 # Software Requirements Specification (SRS) for NetGuard Bharat
+Developed by: Prasad Prashant Dabhekar
 
 ## 1. Introduction
 
@@ -31,6 +32,7 @@ The architecture of NetGuard Bharat is divided into several loosely coupled, sca
 
 - **Frontend**: A dynamic, responsive React application built with Three.js to provide 3D geospatial mapping and telemetry visualization.
 - **Backend**: A Node.js and Express server that manages API requests, socket connections, and system orchestration.
+- **Local Scanner API**: A standalone Node.js server that reads the Windows ARP table to identify dynamically connected local endpoints.
 - **Python Tap**: A dedicated packet-sniffing component using Scapy to capture live network traffic, extract telemetry, and filter out noise.
 - **AI Engine**: Integrated with Ollama (local models) and Gemini (cloud capabilities) to provide heuristic summaries and basic payload evaluation.
 - **Socket Communication**: Uses Socket.IO to maintain low-latency, bidirectional real-time data streaming from the tap to the frontend dashboard.
@@ -44,6 +46,7 @@ graph TD
     C -->|Analysis Results| B
     B -->|Real-Time Socket.IO| D[React Frontend]
     D -->|3D Visualization| E((Three.js Map))
+    F[Local Scanner API] -->|ARP Table Data| D
 ```
 
 ---
@@ -51,6 +54,7 @@ graph TD
 ## 3. Functional Requirements
 
 - **Real-time Socket Monitoring**: The system must establish and maintain live socket connections to stream network telemetry with sub-second latency.
+- **Endpoint Discovery**: The system must scan the local network ARP table to discover, validate, and track dynamic host endpoints via an isolated API, supported by aggressive frontend polling (3-second intervals) to maintain precise real-time synchronization.
 - **AI Threat Analysis**: The system must evaluate packet payloads, highlight suspicious text strings, and generate summaries using AI models.
 - **PDF Generation**: The system must provide a capability to export threat analysis reports and system summaries in PDF format for offline review.
 - **Geofencing**: The system must cross-reference IP addresses to filter, allow, or block traffic based on geographic boundaries.
@@ -80,29 +84,43 @@ graph TD
 
 ## 6. Data Flow
 
-Telemetry moves through the system in a structured, sequential pipeline:
+The system operates using a Two-Brain Architecture to ensure safe, high-performance data interception without bottlenecks:
+
+### Pipeline A: Real-Time Sockets (Active Traffic)
 1. **Capture**: The Python tap sniffs packets from the network interface.
 2. **Extraction**: Relevant metadata (Source/Dest IP, Ports, Protocol, Payload size) is extracted.
-3. **Transmission**: The Python tap pushes telemetry to the Node.js backend via TCP/UDP or sockets.
-4. **Enrichment & Analysis**: The backend fetches GeoIP data and queries the AI engine to evaluate the payload.
-5. **Broadcasting**: The enriched, scored telemetry is broadcasted via Socket.IO to connected frontend clients.
+3. **Transmission**: The Python tap pushes telemetry to the Node.js backend via API `/api/alert`.
+4. **Enrichment**: The backend maps active sockets to processes via `netstat` and `tasklist`.
+5. **Broadcasting**: The enriched telemetry is broadcasted via Socket.IO to connected frontend clients.
 6. **Rendering**: The React frontend updates its state, plotting the new data points onto the Three.js 3D globe.
 
-### Telemetry Flow Diagram
+### Pipeline B: API Polling (Endpoint Discovery)
+1. **ARP Polling**: A dedicated Local Network Scanner API (`endpoint_server.js`) runs `arp -a` commands on the host machine.
+2. **Filtering**: The output is parsed to extract dynamic IPv4 addresses and MAC addresses.
+3. **Classification**: Devices are classified as Infrastructure (Routers/Gateways) or Clients.
+4. **Aggressive Fetching**: The React frontend aggressively polls this API every 3 seconds, entirely replacing state memory so disconnected endpoints are instantly removed from the UI.
+
+### Two-Brain Flow Diagram
 
 ```mermaid
 sequenceDiagram
-    participant Tap as Python Tap (Scapy)
-    participant Backend as Node.js Backend
-    participant AI as AI Engine (Ollama/Gemini)
-    participant UI as React Frontend (Three.js)
-
-    Tap->>Backend: Send Raw Telemetry (IPs, Payload)
-    Backend->>Backend: GeoIP Lookup & Filtering
-    Backend->>AI: Request Threat Analysis
-    AI-->>Backend: Return Threat Score & Insights
-    Backend->>UI: Emit Enriched Data via Socket.IO
-    UI->>UI: Update 3D Map & Threat Log
+    participant Tap as Python Tap
+    participant Scanner as Endpoint Scanner
+    participant Backend as Express Backend
+    participant UI as React Frontend
+    
+    note over Tap, Backend: Pipeline A: Active Traffic (Socket.IO)
+    Tap->>Backend: Post Threat Telemetry (/api/alert)
+    Backend->>Backend: Map PIDs & Executables
+    Backend->>UI: Emit Socket.IO Event
+    UI->>UI: Render 3D Globe & History Logs
+    
+    note over Scanner, UI: Pipeline B: Device Discovery (API Polling)
+    Scanner->>Scanner: Execute 'arp -a'
+    Scanner->>Scanner: Parse & Classify (Router/Client)
+    UI->>Scanner: Fetch /api/endpoints (Interval)
+    Scanner-->>UI: Return JSON Endpoint Array
+    UI->>UI: Update Telemetry Modal
 ```
 
 ---

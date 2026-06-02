@@ -75,3 +75,20 @@ The system consists of three main components:
 *   **Visualization Restoration**: Fixed the data pipeline feeding the Globe map and Intelligence Feed. Passed a deduped, merged array of `leaks` and `rawLogs` to ensure red threat arcs remain persistently visible alongside live traffic arcs.
 *   **Enterprise PDF Standards**: Overhauled the jsPDF export logic. Formatted timestamps natively using `toLocaleString`, enforced reverse-chronological sorting, implemented a soft-white readable background with premium dark slate text, mapped ISO country codes to full names, and fixed duplicate row printing by reading directly from `historicalLogs`.
 *   **Strict Data Algorithms**: Removed fuzzy, hallucination-prone mock logic. Bound packet generation to strict, hardcoded arrays (`PROCESS_LIST`, `COUNTRY_LIST`) and enforced a strict `.join('.')` IP construction algorithm to prevent malformed telemetry strings.
+
+### ⚡ Phase 11: Hydration, 3D Jitter & Network Scanner API
+*   **First-Tick Hydration Check**: Built conditional logic inside the primary interval loop to force the first spawned packet as a 'THREAT' if `historicalLogs` is empty, instantly populating the Intelligence Feed on page load.
+*   **3D Arc Overlap Fix (Jitter & Altitude)**: Implemented a strict Coordinate Dictionary (`COUNTRY_COORDS`) using hardcoded float arrays to resolve Z-fighting. Upgraded `react-globe.gl` accessors (`arcEndLat`, `arcEndLng`, `arcAltitude`) with `Math.random()` offsets to create a visual fanning effect for concurrent connections to the same country.
+*   **Local Network Scanner API**: Deployed a standalone Node.js Express server (`endpoint_server.js`) on port 3001. It uses `child_process.exec` to parse the Windows `arp -a` table, applying regex filters to extract and serve dynamic IPv4 nodes and MAC addresses as JSON.
+*   **Secure Telemetry Modal**: Carefully injected a standalone "ENDPOINTS SECURED" metric card between the Engine Status and Real-Time Controls blocks to preserve flex grid layout. Implemented a floating glassmorphic table modal to display live IP/MAC telemetry polled from the Scanner API.
+
+### 📐 Phase 12: Infrastructure Classification & Typography Scaling
+*   **Router & Gateway UI Interception**: Refined the backend ARP parser to explicitly identify local routers (`192.168.0.1`, `192.168.1.1`). Built frontend interception logic inside the Telemetry Modal mapping to dynamically prepend distinct device emojis (📡 Router, 💻 Gateway, 📱 Client) to the IP strings.
+*   **Flat Table Reversion**: Simplified the Telemetry Modal layout back to a high-performance, single flat table structure. Removed cumbersome `colSpan` category headers in favor of robust, conditional Tailwind CSS badge styling on the Status column (Amber for Infrastructure, Cyan for Gateways, Green for Nodes) to achieve immediate visual distinction without DOM bloat.
+*   **Typography Upgrades**: Scaled up font sizes (`text-sm`, `text-base`) and expanded vertical padding (`py-3`) across the Raw Logs history component to eliminate eye strain. 
+*   **Horizontal Scroller Integration**: Applied `overflow-x-auto` with a strict `min-w-[700px]` boundary on log rows to ensure horizontal scrollability, preventing data truncation or overlapping on smaller viewports.
+
+### 📱 Phase 13: Mobile Telemetry & Auto-Polling
+*   **Unified Threat Reports**: Merged live endpoint states and historical network logs into a single, comprehensive `jsPDF-autotable` layout, standardizing a 6-column schema (Timestamp, Status, Source IP, Source Process, Destination IP, Country).
+*   **Aggressive Endpoint Polling**: Rewrote the React `useEffect` data fetcher into a strict 3000ms polling interval. State arrays are now completely overwritten (not appended) to instantly remove disconnected mobile devices from the UI.
+*   **Mobile Traffic Interception**: Engineered a frontend interception layer that monitors active mobile clients (e.g., Vivo Y19e Client). Automatically intercepts packet generation to swap the standard localhost IP with the mobile device's actual dynamically assigned IP, accurately attributing traffic down to the device level.

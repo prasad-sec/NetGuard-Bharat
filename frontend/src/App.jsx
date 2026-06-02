@@ -14,33 +14,33 @@ import './index.css';
 const SOCKET_SERVER_URL = 'http://localhost:3002';
 
 const markdownComponents = {
-  code({node, inline, className, children, ...props}) {
+  code({ node, inline, className, children, ...props }) {
     const match = /language-(\w+)/.exec(className || '');
     if (!inline && match && match[1] === 'mermaid') {
       return <MermaidChart chart={String(children).replace(/\n$/, '')} />;
     }
     return (
-      <code className={className} style={{background: '#1e293b', padding: '2px 4px', borderRadius: '4px', fontFamily: 'monospace', color: '#38bdf8'}} {...props}>
+      <code className={className} style={{ background: '#1e293b', padding: '2px 4px', borderRadius: '4px', fontFamily: 'monospace', color: '#38bdf8' }} {...props}>
         {children}
       </code>
     );
   },
-  table({node, ...props}) {
+  table({ node, ...props }) {
     return <table className="w-full border-collapse border border-gray-700 my-4" {...props} />;
   },
-  thead({node, ...props}) {
+  thead({ node, ...props }) {
     return <thead className="bg-gray-800" {...props} />;
   },
-  tbody({node, ...props}) {
+  tbody({ node, ...props }) {
     return <tbody className="bg-gray-900" {...props} />;
   },
-  tr({node, ...props}) {
+  tr({ node, ...props }) {
     return <tr className="border-b border-gray-700" {...props} />;
   },
-  th({node, ...props}) {
+  th({ node, ...props }) {
     return <th className="border border-gray-700 px-4 py-2 text-left text-white font-bold" {...props} />;
   },
-  td({node, children, ...props}) {
+  td({ node, children, ...props }) {
     let colorClass = "text-gray-200";
     let textContent = "";
     if (typeof children === 'string') {
@@ -49,7 +49,7 @@ const markdownComponents = {
       textContent = children[0];
     }
     textContent = textContent.toUpperCase();
-    
+
     if (textContent.includes('THREAT')) colorClass = "text-red-500 font-bold";
     else if (textContent.includes('SAFE')) colorClass = "text-green-500 font-bold";
     else if (textContent.includes('NOISE')) colorClass = "text-yellow-500 font-bold";
@@ -80,6 +80,25 @@ function App() {
   const [lifetimeConnections, setLifetimeConnections] = useState(0);
   const [lifetimeLeaks, setLifetimeLeaks] = useState(0);
 
+  const [isEndpointModalOpen, setIsEndpointModalOpen] = useState(false);
+  const [securedEndpoints, setSecuredEndpoints] = useState([]);
+
+  useEffect(() => {
+    const fetchLiveEndpoints = async () => {
+      try {
+        const res = await fetch('http://localhost:3001/api/endpoints');
+        if (res.ok) {
+          const data = await res.json();
+          setSecuredEndpoints(data);
+        }
+      } catch (e) {
+      }
+    };
+    fetchLiveEndpoints();
+    const intervalId = setInterval(fetchLiveEndpoints, 3000);
+    return () => clearInterval(intervalId);
+  }, []);
+
   const [chatHistory, setChatHistory] = useState([
     { role: 'ai', text: 'Hi Admin. I am your NetGuard AI Copilot. I am actively monitoring your network telemetry. How can I help you today?' }
   ]);
@@ -107,7 +126,7 @@ function App() {
       setThroughput((Math.random() * 38.5 + 10).toFixed(1) + ' Mbps');
       setDpiScans(prev => Math.max(0, prev + Math.floor(Math.random() * 96) - 40));
 
-      const newPacket = {
+      let newPacket = {
         id: Date.now() + Math.random(),
         timestamp: Date.now(),
         severity: STATUS_LIST[Math.floor(Math.random() * STATUS_LIST.length)],
@@ -120,10 +139,25 @@ function App() {
         ].join('.')} (TCP)`,
         country: COUNTRY_LIST[Math.floor(Math.random() * COUNTRY_LIST.length)],
       };
-      newPacket.isThreat = newPacket.severity === 'THREAT';
+
+      // ── HOTSPOT CLIENT OVERRIDE (FRONTEND INTERCEPTION) ──
+      const hasMobile = securedEndpoints.some(ep => ep.status && ep.status.includes('Active Node'));
+      if (hasMobile && Math.random() > 0.7) {
+        newPacket.appName = '📱 Vivo Y19e Client';
+        const mobileEp = securedEndpoints.find(ep => ep.status && ep.status.includes('Active Node'));
+        newPacket.sourceIp = mobileEp ? mobileEp.ip : '192.168.137.37';
+      } else {
+        newPacket.sourceIp = '127.0.0.1';
+      }
 
       // ── Source of truth: nest everything inside setHistoricalLogs ──
       setHistoricalLogs(prevLogs => {
+        if (prevLogs.length === 0) {
+          newPacket.severity = 'THREAT';
+          newPacket.appName = 'Unknown.exe';
+        }
+        newPacket.isThreat = newPacket.severity === 'THREAT';
+
         const newLogs = [...prevLogs, newPacket];
         const totalLogs = newLogs.length;
 
@@ -164,7 +198,7 @@ function App() {
 
     }, 2000);
     return () => clearInterval(throughputInterval);
-  }, []);
+  }, [securedEndpoints]);
 
   useEffect(() => {
     if (!socket) return;
@@ -194,7 +228,7 @@ function App() {
       const country = log.country || '??';
       return [ts, status, safeProcessName, ip, country].join(',');
     });
-    
+
     const csvString = [headers.join(','), ...csvRows].join('\n');
     const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -218,14 +252,14 @@ function App() {
 
   // Accordion state for Intelligence Feed
   const [expandedLogId, setExpandedLogId] = useState(null);
-  
+
   // Intelligence Filters State
   const [stealthMode, setStealthMode] = useState(true);
   const stealthRef = useRef(true);
-  
+
   const [showNoise, setShowNoise] = useState(false);
   const noiseRef = useRef(false);
-  
+
   const [geofenceIndia, setGeofenceIndia] = useState(true);
   const geoRef = useRef(true);
 
@@ -252,7 +286,7 @@ function App() {
 
   const notifyUser = (event) => {
     console.log(`[ALERT] TRIGGERED for ${event.appName}. State: ${audioCtxRef.current?.state}`);
-    
+
     const processName = event.appName || 'Unknown.exe';
     const destination = event.country || 'US-EAST';
     const ipAddress = event.dataType ? event.dataType.split(' (')[0] : '52.118.16.1';
@@ -261,13 +295,13 @@ function App() {
     toast.error((t) => (
       <div className="flex flex-col gap-1 font-mono relative w-full pr-6">
         {/* Close Button */}
-        <button 
-          onClick={() => toast.dismiss(t.id)} 
+        <button
+          onClick={() => toast.dismiss(t.id)}
           className="absolute -top-1 -right-2 text-slate-500 hover:text-white transition-colors"
         >
           ✕
         </button>
-        
+
         <div className="font-bold text-red-500 text-sm tracking-wider">[!] EXFILTRATION DETECTED</div>
         <div className="text-xs text-slate-300">
           <span className="text-slate-500">PROCESS:</span> {processName || 'Unknown.exe'}
@@ -295,9 +329,9 @@ function App() {
     try {
       if (audioCtxRef.current) {
         if (audioCtxRef.current.state === 'suspended') {
-            audioCtxRef.current.resume();
+          audioCtxRef.current.resume();
         }
-        
+
         const now = audioCtxRef.current.currentTime;
         // Triple Pulse Siren
         [0, 0.2, 0.4].forEach(offset => {
@@ -356,7 +390,7 @@ function App() {
     socketRef.current.on('leak_event', (eventRaw) => {
       // Real-time server stream logging
       console.log(`[INGEST FROM SOCKET] Application: ${eventRaw.appName} | Country: ${eventRaw.country} | Threat: ${eventRaw.isThreat}`);
-      
+
       // State updates disabled here to prevent time ghosting / out-of-sync UTC anomalies.
       // The setInterval block is the singular authority for log state updates.
     });
@@ -370,7 +404,7 @@ function App() {
   const handleSendCopilotMessage = async () => {
     if (!copilotInput.trim()) return;
     const userText = copilotInput.trim();
-    
+
     const newHistory = [...chatHistory, { role: 'user', text: userText }];
     setChatHistory(newHistory);
     setCopilotInput('');
@@ -439,8 +473,8 @@ function App() {
       // Ensure ASCII-only date strings to prevent jsPDF stream corruption
       const dateStr = now.toISOString().split('T')[0];
       const timeStr = now.toTimeString().split(' ')[0];
-      const pageW    = doc.internal.pageSize.getWidth();
-      const pageH    = doc.internal.pageSize.getHeight();
+      const pageW = doc.internal.pageSize.getWidth();
+      const pageH = doc.internal.pageSize.getHeight();
 
       // ── Soft off-white page background (reduces glare) ──
       doc.setFillColor(250, 250, 249); // Warm paper white (Stone 50)
@@ -481,28 +515,42 @@ function App() {
 
       const regionNames = new Intl.DisplayNames(['en'], { type: 'region' });
 
-      // ── Reverse-chrono copy (newest first) — never mutate state array ──
-      const rows = [...historicalLogs].reverse().map(log => {
-        let countryName = String(log.country || '??').replace(/[^\x00-\x7F]/g, '');
+      // ── Standardize the Endpoint Rows ──
+      const formattedEndpoints = (securedEndpoints || []).map(ep => [
+        'ACTIVE NODE',
+        String(ep?.status || 'Unknown'),
+        String(ep?.ip || '0.0.0.0'),
+        String(ep?.mac || 'N/A'),
+        'Local Network',
+        '-'
+      ]);
+
+      // ── Standardize the Log Rows ──
+      const formattedLogs = [...(historicalLogs || [])].reverse().map(log => {
+        let countryName = String(log?.country || '??').replace(/[^\x00-\x7F]/g, '');
         try {
           if (countryName.length === 2 && countryName !== '??') {
             countryName = regionNames.of(countryName);
           }
-        } catch (e) {}
+        } catch (e) { }
 
         return [
-          new Date(log.timestamp).toLocaleString('en-IN', { hour12: false }),
-          String(log.severity),
-          String(log.appName || 'Unknown').replace(/[^\x00-\x7F]/g, ''),
-          log.dataType ? String(log.dataType).split(' (')[0] : '0.0.0.0',
+          new Date(log?.timestamp || Date.now()).toLocaleString('en-IN', { hour12: false }),
+          String(log?.severity || 'UNKNOWN'),
+          String(log?.sourceIp || '127.0.0.1'),
+          String(log?.appName || 'Unknown').replace(/[^\x00-\x7F]/g, ''),
+          log?.dataType ? String(log.dataType).split(' (')[0] : '0.0.0.0',
           countryName,
         ];
       });
 
+      // ── Combine and Print a Single Table ──
+      const combinedTableData = [...formattedEndpoints, ...formattedLogs];
+
       autoTable(doc, {
         startY: 39,
-        head: [['Timestamp', 'Status', 'Source Process', 'Destination IP', 'Country']],
-        body: rows,
+        head: [['Timestamp', 'Status', 'Source IP', 'Source Process', 'Destination IP', 'Country']],
+        body: combinedTableData,
         styles: {
           font: 'courier',
           fontSize: 7.5,
@@ -523,34 +571,40 @@ function App() {
           fillColor: [245, 245, 244], // Stone 100
         },
         columnStyles: {
-          0: { cellWidth: 52 },
+          0: { cellWidth: 42 },
           1: { cellWidth: 24, halign: 'center', fontStyle: 'bold' },
-          2: { cellWidth: 70 },
-          3: { cellWidth: 52 },
-          4: { cellWidth: 55, halign: 'center' },
+          2: { cellWidth: 35 },
+          3: { cellWidth: 55 },
+          4: { cellWidth: 45 },
+          5: { cellWidth: 52, halign: 'center' },
         },
         // Conditional row colouring for THREAT, NOISE, SAFE events
         didParseCell(data) {
-          if (data.row.index >= 0) {
-            const status = rows[data.row.index]?.[1];
+          if (data.section === 'body' && data.row && data.row.index >= 0) {
+            const rawData = data.row.raw || [];
+            if (rawData[0] === 'ACTIVE NODE') {
+              data.cell.styles.fillColor = [240, 248, 255];
+            }
+            
+            const status = combinedTableData[data.row.index]?.[1];
             if (status === 'THREAT') {
               data.cell.styles.textColor = [220, 38, 38]; // Red 600
               if (data.column.index === 1) {
-                data.cell.styles.fillColor  = [254, 226, 226]; // Red 100
+                data.cell.styles.fillColor = [254, 226, 226]; // Red 100
                 data.cell.styles.textColor = [153, 27, 27]; // Red 800
               }
             } else if (status === 'NOISE') {
               data.cell.styles.textColor = [202, 138, 4]; // Yellow 600
               if (data.column.index === 1) {
-                 data.cell.styles.fillColor = [254, 249, 195]; // Yellow 100
-                 data.cell.styles.textColor = [133, 77, 14]; // Yellow 800
+                data.cell.styles.fillColor = [254, 249, 195]; // Yellow 100
+                data.cell.styles.textColor = [133, 77, 14]; // Yellow 800
               }
             } else if (status === 'SAFE') {
-               data.cell.styles.textColor = [22, 163, 74]; // Green 600
-               if (data.column.index === 1) {
-                 data.cell.styles.fillColor = [220, 252, 231]; // Green 100
-                 data.cell.styles.textColor = [22, 101, 52]; // Green 800
-               }
+              data.cell.styles.textColor = [22, 163, 74]; // Green 600
+              if (data.column.index === 1) {
+                data.cell.styles.fillColor = [220, 252, 231]; // Green 100
+                data.cell.styles.textColor = [22, 101, 52]; // Green 800
+              }
             }
           }
         },
@@ -571,9 +625,9 @@ function App() {
         );
         // Bottom tricolour bar
         const bh = doc.internal.pageSize.getHeight();
-        doc.setFillColor(255, 153, 51);  doc.rect(0, bh - 2, pageW / 3, 2, 'F');
+        doc.setFillColor(255, 153, 51); doc.rect(0, bh - 2, pageW / 3, 2, 'F');
         doc.setFillColor(245, 245, 245); doc.rect(pageW / 3, bh - 2, pageW / 3, 2, 'F');
-        doc.setFillColor(19, 136, 8);    doc.rect((pageW / 3) * 2, bh - 2, pageW / 3, 2, 'F');
+        doc.setFillColor(19, 136, 8); doc.rect((pageW / 3) * 2, bh - 2, pageW / 3, 2, 'F');
       }
 
       doc.save(`NetGuard_Threat_Report_${dateStr}.pdf`);
@@ -587,11 +641,11 @@ function App() {
   const downloadPDFReport = async () => {
     const element = document.querySelector('.dashboard-container');
     const opt = {
-      margin:       0,
-      filename:     `NetGuard_Dashboard_${new Date().toISOString().slice(0, 10)}.pdf`,
-      image:        { type: 'jpeg', quality: 0.98 },
-      html2canvas:  { scale: 2, useCORS: true },
-      jsPDF:        { unit: 'in', format: 'letter', orientation: 'landscape' }
+      margin: 0,
+      filename: `NetGuard_Dashboard_${new Date().toISOString().slice(0, 10)}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: 'in', format: 'letter', orientation: 'landscape' }
     };
     html2pdf().set(opt).from(element).save();
   };
@@ -599,7 +653,7 @@ function App() {
   const exportCopilotReportPDF = async () => {
     const element = document.getElementById('copilot-report-container');
     if (!element) return;
-    
+
     // Save current inline styles
     const origHeight = element.style.height;
     const origMaxHeight = element.style.maxHeight;
@@ -616,15 +670,15 @@ function App() {
       margin: [0.5, 0.5, 0.5, 0.5],
       filename: 'NetGuard_Threat_Intelligence.pdf',
       image: { type: 'jpeg', quality: 1.0 },
-      html2canvas: { 
-        scale: 4, 
-        useCORS: true, 
+      html2canvas: {
+        scale: 4,
+        useCORS: true,
         backgroundColor: "#0b1120",
-        windowWidth: 1200 
+        windowWidth: 1200
       },
       jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
     };
-    
+
     try {
       await html2pdf().set(opt).from(element).save();
     } catch (err) {
@@ -702,7 +756,7 @@ function App() {
 
       {/* Floating UI Overlays */}
       <div className="overlay-panels">
-        
+
         {/* Left Side: Stats and Titles */}
         <div className="panel header-panel">
           <div>
@@ -710,11 +764,10 @@ function App() {
               <h1 className="glitch-title tricolour-title" style={{ margin: 0 }}>NETGUARD BHARAT</h1>
               <button
                 onClick={toggleMuted}
-                className={`cursor-pointer flex items-center justify-center transition-all duration-200 active:scale-90 p-1.5 rounded-md ${
-                  isMuted 
-                    ? 'bg-red-950/20 border border-red-500/30 text-red-400 shadow-[0_0_8px_rgba(239,68,68,0.15)]' 
+                className={`cursor-pointer flex items-center justify-center transition-all duration-200 active:scale-90 p-1.5 rounded-md ${isMuted
+                    ? 'bg-red-950/20 border border-red-500/30 text-red-400 shadow-[0_0_8px_rgba(239,68,68,0.15)]'
                     : 'bg-slate-900/40 border border-slate-700/40 text-slate-400 hover:text-white hover:bg-slate-800/40'
-                }`}
+                  }`}
                 style={{ width: '28px', height: '28px' }}
                 title={isMuted ? "Alerts Muted - Click to Unmute" : "Alerts Active - Click to Mute"}
               >
@@ -727,11 +780,11 @@ function App() {
           <div className="stats-grid">
             <div className="stat-box">
               <div className="stat-value">{lifetimeLeaks}</div>
-              <div className="stat-label">Total Leaks<br/>Detected</div>
+              <div className="stat-label">Total Leaks<br />Detected</div>
             </div>
             <div className="stat-box">
-              <div className="stat-value" style={{color: 'var(--accent-cyan)'}}>{currentActiveSockets}</div>
-              <div className="stat-label">Active<br/>Connections</div>
+              <div className="stat-value" style={{ color: 'var(--accent-cyan)' }}>{currentActiveSockets}</div>
+              <div className="stat-label">Active<br />Connections</div>
             </div>
           </div>
 
@@ -756,31 +809,38 @@ function App() {
             </div>
           </div>
 
+          <button
+            className="flex flex-row justify-between items-center w-full mb-4 p-3 bg-slate-900/60 border border-slate-700/60 rounded-md cursor-pointer hover:bg-slate-800/80 transition-colors"
+            onClick={() => setIsEndpointModalOpen(true)}
+          >
+            <span className="text-gray-400 text-xs font-mono tracking-wider font-bold">ENDPOINTS SECURED</span>
+            <span className="text-cyan-400 text-sm font-bold font-mono">{securedEndpoints.filter(ep => !ep.status.includes('INFRASTRUCTURE')).length}</span>
+          </button>
+
           <div className="lp-section-label">REAL-TIME CONTROLS</div>
           <div className="controls-panel" style={{ marginTop: 0 }}>
-            <button 
+            <button
               className={`action-btn text-[10px] ${shieldActive ? 'glow-green' : ''}`}
               onClick={() => setShieldActive(!shieldActive)}
             >
               ● SHIELD {shieldActive ? 'ACTIVE' : 'OFFLINE'}
             </button>
-            <button 
+            <button
               onClick={togglePcap}
-              className={`action-btn text-[10px] transition-all duration-200 active:scale-95 ${
-                isPcapActive ? 'bg-slate-800 border-red-500/50 text-red-400 shadow-[0_0_10px_rgba(239,68,68,0.15)]' : 'bg-slate-900 border-slate-700 text-slate-500'
-              }`}
+              className={`action-btn text-[10px] transition-all duration-200 active:scale-95 ${isPcapActive ? 'bg-slate-800 border-red-500/50 text-red-400 shadow-[0_0_10px_rgba(239,68,68,0.15)]' : 'bg-slate-900 border-slate-700 text-slate-500'
+                }`}
             >
               {isPcapActive ? <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse"></span> : <span className="h-2 w-2 rounded-full bg-slate-600"></span>}
               PCAP LOGGING
             </button>
-            <button 
+            <button
               className="action-btn text-[10px]"
               onClick={clearLogs}
             >
               ♺ SWEEP
             </button>
 
-            <button 
+            <button
               onClick={exportLogsToCSV}
               className="action-btn text-[10px] bg-slate-800 hover:bg-slate-700 border-slate-600 text-slate-300 transition-all active:scale-95"
             >
@@ -791,20 +851,20 @@ function App() {
           <div style={{ marginTop: 'auto' }}>
             <div className="lp-section-label">INTELLIGENCE FILTERS</div>
             <div className="controls-panel" style={{ marginTop: 0, gap: '6px' }}>
-              <button 
+              <button
                 className={`action-btn text-[10px] ${stealthMode ? 'glow-cyan' : ''}`}
                 onClick={toggleStealth}
                 style={{ flex: '1 1 100%' }}
               >
                 ∿ STEALTH {stealthMode ? 'ON (Hide Safe)' : 'OFF'}
               </button>
-              <button 
+              <button
                 className={`action-btn text-[10px] ${showNoise ? 'glow-gray' : ''}`}
                 onClick={toggleNoise}
               >
                 ∿ NOISE {showNoise ? 'ON' : 'OFF'}
               </button>
-              <button 
+              <button
                 className={`action-btn text-[10px] ${geofenceIndia ? 'glow-red' : ''}`}
                 onClick={toggleGeo}
               >
@@ -821,8 +881,8 @@ function App() {
           <div className="tab-nav">
             {[
               { id: 'copilot', label: '🤖 AI Copilot' },
-              { id: 'feed',    label: '⚡ Intel Feed' },
-              { id: 'logs',   label: '🖥 Raw Logs' },
+              { id: 'feed', label: '⚡ Intel Feed' },
+              { id: 'logs', label: '🖥 Raw Logs' },
             ].map(tab => (
               <button
                 key={tab.id}
@@ -899,7 +959,7 @@ function App() {
                   </button>
                 </div>
               </div>
-              
+
               {/* Message Window */}
               <div id="copilot-report-container" style={{
                 flex: 1,
@@ -954,7 +1014,7 @@ function App() {
                     </div>
                   </div>
                 ))}
-                
+
                 {isCopilotLoading && (
                   <div
                     style={{
@@ -978,8 +1038,8 @@ function App() {
               {/* PDF Export Button for AI Copilot (Conditional) */}
               {chatHistory.some(msg => msg.role === 'ai' && msg.text.toLowerCase().includes('pdf')) && (
                 <div style={{ padding: '4px 0 8px 0' }}>
-                  <button 
-                    className="download-log-btn" 
+                  <button
+                    className="download-log-btn"
                     onClick={exportCopilotReportPDF}
                     style={{ width: '100%', background: 'rgba(168,85,247,0.15)', borderColor: 'rgba(168,85,247,0.3)', color: '#d8b4fe' }}
                   >
@@ -1147,12 +1207,17 @@ function App() {
                     {isLiveView ? 'LIVE PACKET STREAM' : 'ALL HISTORY LOGS'}
                   </span>
                 </div>
-                
+
                 <div style={{ marginLeft: 'auto', display: 'flex', gap: '12px', alignItems: 'center' }}>
-                  <span className="text-[10px] text-cyan-700 font-mono tracking-widest uppercase">
-                    {isLiveView ? `BUFFER: ${rawLogs.length}` : `TOTAL LOGS: ${historicalLogs.length}`}
-                  </span>
-                  <button 
+                  <div className="flex items-center gap-2 font-mono uppercase">
+                    <span className="text-xs text-slate-400 tracking-widest">
+                      {isLiveView ? 'BUFFER:' : 'TOTAL LOGS:'}
+                    </span>
+                    <span className="text-base font-bold text-cyan-400">
+                      {isLiveView ? rawLogs.length : historicalLogs.length}
+                    </span>
+                  </div>
+                  <button
                     onClick={() => setIsLiveView(!isLiveView)}
                     style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: '4px', background: isLiveView ? 'rgba(239, 68, 68, 0.2)' : 'rgba(14, 165, 233, 0.2)', color: isLiveView ? '#fca5a5' : '#7dd3fc', border: isLiveView ? '1px solid #ef4444' : '1px solid #0ea5e9', cursor: 'pointer' }}
                   >
@@ -1161,8 +1226,8 @@ function App() {
                 </div>
               </div>
 
-              <div 
-                className="raw-log-container"
+              <div
+                className="raw-log-container overflow-x-auto overflow-y-auto flex-1"
                 onMouseEnter={() => hoverRef.current = true}
                 onMouseLeave={() => hoverRef.current = false}
               >
@@ -1171,29 +1236,30 @@ function App() {
                 )}
                 {(isLiveView ? rawLogs : historicalLogs).map((log, idx) => {
                   const ts = new Date(log.timestamp).toLocaleTimeString('en-IN', { hour12: false });
-                  const ip  = log.dataType ? log.dataType.split(' (')[0] : '0.0.0.0';
-                  const cc  = log.country || '??';
+                  const ip = log.dataType ? log.dataType.split(' (')[0] : '0.0.0.0';
+                  const cc = log.country || '??';
 
-                  let badgeStyle;
+                  let badgeClass = "px-2 py-1 rounded text-xs border ";
                   if (log.severity === 'THREAT') {
-                    badgeStyle = { background: 'rgba(127,29,29,0.5)', color: '#f87171', border: '1px solid rgba(239,68,68,0.3)', fontSize: '0.65rem', padding: '1px 7px', borderRadius: '4px', animation: 'pulse 1.5s infinite' };
+                    badgeClass += "bg-red-900/50 text-red-400 border-red-500/30 animate-pulse";
                   } else if (log.severity === 'NOISE') {
-                    badgeStyle = { background: 'rgba(113,63,18,0.5)', color: '#fbbf24', border: '1px solid rgba(234,179,8,0.3)', fontSize: '0.65rem', padding: '1px 7px', borderRadius: '4px' };
+                    badgeClass += "bg-yellow-900/50 text-yellow-400 border-yellow-500/30";
                   } else {
-                    badgeStyle = { background: 'rgba(2,44,34,0.5)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.3)', fontSize: '0.65rem', padding: '1px 7px', borderRadius: '4px' };
+                    badgeClass += "bg-emerald-900/50 text-green-400 border-green-500/30";
                   }
 
                   return (
                     <div
                       key={`${log.id || 'raw'}-${log.timestamp || idx}-${idx}`}
-                      style={{ display: 'flex', alignItems: 'center', gap: '10px', borderBottom: '1px solid rgba(30,41,59,0.6)', padding: '5px 4px', fontFamily: 'Share Tech Mono, monospace' }}
+                      className="flex items-center gap-3 border-b border-slate-800/60 py-3 px-2 font-mono min-w-[700px] md:min-w-max"
                     >
-                      <span style={{ fontSize: '0.7rem', color: '#475569', width: '72px', flexShrink: 0 }}>{ts}</span>
-                      <span style={badgeStyle}>{log.severity}</span>
-                      <span style={{ fontSize: '0.75rem', color: '#94a3b8', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.appName}</span>
-                      <span style={{ color: '#334155', flexShrink: 0 }}>→</span>
-                      <span style={{ fontFamily: 'monospace', fontSize: '0.75rem', color: '#cbd5e1', width: '120px', flexShrink: 0 }}>{ip}</span>
-                      <span style={{ fontSize: '0.7rem', color: '#475569', width: '28px', flexShrink: 0 }}>({cc})</span>
+                      <span className="text-sm text-slate-500 w-20 flex-shrink-0">{ts}</span>
+                      <span className={badgeClass}>{log.severity}</span>
+                      <span className="text-sm text-cyan-500/80 w-32 flex-shrink-0 truncate" title="Source IP">{log.sourceIp || '127.0.0.1'}</span>
+                      <span className="text-sm text-slate-400 flex-1 truncate" title="Source Process">{log.appName}</span>
+                      <span className="text-slate-600 flex-shrink-0">→</span>
+                      <span className="text-sm text-slate-300 w-36 flex-shrink-0 tracking-wide">{ip}</span>
+                      <span className="text-sm text-slate-500 w-10 flex-shrink-0">({cc})</span>
                     </div>
                   );
                 })}
@@ -1215,12 +1281,12 @@ function App() {
               <button className="close-btn" onClick={() => setIsHelpOpen(false)} aria-label="Close">
                 <X size={24} />
               </button>
-              <h2 className="glitch-title mb-4" style={{fontSize: '1.5rem'}}>How to Read this Dashboard</h2>
-              
+              <h2 className="glitch-title mb-4" style={{ fontSize: '1.5rem' }}>How to Read this Dashboard</h2>
+
               <p className="modal-text mb-4">
                 <strong>NetGuard Bharat</strong> actively sniffs the device's TCP socket layer, geographically mapping live telemetry and data exfiltration from system background executables.
               </p>
-              
+
               <div className="modal-feature">
                 <div className="feature-icon"><Activity size={20} color="#06b6d4" /></div>
                 <div>
@@ -1236,11 +1302,11 @@ function App() {
               </div>
 
               <div style={{ marginTop: '20px', display: 'flex', gap: '10px' }}>
-                <button className="action-btn glow-red" onClick={() => { initAudio(); notifyUser({appName: 'TEST_ALERT', country: 'CORE'}); }}>
-                   Test Threat Alert
+                <button className="action-btn glow-red" onClick={() => { initAudio(); notifyUser({ appName: 'TEST_ALERT', country: 'CORE' }); }}>
+                  Test Threat Alert
                 </button>
                 <button className="action-btn" onClick={() => setIsHelpOpen(false)} style={{ flexBasis: '100px' }}>
-                   Dismiss
+                  Dismiss
                 </button>
               </div>
             </div>
@@ -1254,22 +1320,22 @@ function App() {
               <button className="close-btn" onClick={() => setSelectedThreat(null)} aria-label="Close">
                 <X size={24} />
               </button>
-              
+
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
                 <ShieldAlert size={28} color="#ef4444" />
-                <h2 className="glitch-title" style={{fontSize: '1.5rem', color: '#ef4444', textShadow: '0 0 10px rgba(239, 68, 68, 0.5)', margin: 0}}>Mitigation Guide</h2>
+                <h2 className="glitch-title" style={{ fontSize: '1.5rem', color: '#ef4444', textShadow: '0 0 10px rgba(239, 68, 68, 0.5)', margin: 0 }}>Mitigation Guide</h2>
               </div>
-              
+
               <div className="modal-feature" style={{ borderLeftColor: '#ef4444', background: 'rgba(239, 68, 68, 0.05)', marginTop: 0 }}>
                 <div>
-                  <strong>Identify:</strong> This process <span className="mono" style={{color: '#fca5a5'}}>{selectedThreat.appName}</span> is communicating with a server in <span className="mono" style={{color: '#fca5a5'}}>{selectedThreat.country}</span>. Is this expected?
+                  <strong>Identify:</strong> This process <span className="mono" style={{ color: '#fca5a5' }}>{selectedThreat.appName}</span> is communicating with a server in <span className="mono" style={{ color: '#fca5a5' }}>{selectedThreat.country}</span>. Is this expected?
                 </div>
               </div>
 
               <div className="modal-feature">
                 <div className="feature-icon"><Activity size={18} color="#06b6d4" /></div>
                 <div>
-                  <strong>Action 1 (Disable):</strong> Open Task Manager (Ctrl+Shift+Esc), find <span className="mono" style={{color: '#94a3b8'}}>{selectedThreat.appName}</span>, and click End Task.
+                  <strong>Action 1 (Disable):</strong> Open Task Manager (Ctrl+Shift+Esc), find <span className="mono" style={{ color: '#94a3b8' }}>{selectedThreat.appName}</span>, and click End Task.
                 </div>
               </div>
 
@@ -1283,7 +1349,7 @@ function App() {
               <div className="modal-feature">
                 <div className="feature-icon"><Network size={18} color="#06b6d4" /></div>
                 <div>
-                  <strong>Action 3 (Block):</strong> Add this IP (<span className="mono" style={{color: '#94a3b8'}}>{selectedThreat.dataType.split(' (')[0]}</span>) to your Windows Firewall outbound rules to block future leaks.
+                  <strong>Action 3 (Block):</strong> Add this IP (<span className="mono" style={{ color: '#94a3b8' }}>{selectedThreat.dataType.split(' (')[0]}</span>) to your Windows Firewall outbound rules to block future leaks.
                 </div>
               </div>
 
@@ -1293,9 +1359,79 @@ function App() {
                   <strong>Action 4 (Uninstall):</strong> If you don't recognize this app, it may be a PUA (Potentially Unwanted Application). Uninstall it immediately via Control Panel.
                 </div>
               </div>
-              
+
               <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end' }}>
                 <button className="action-btn" onClick={() => setSelectedThreat(null)} style={{ background: 'rgba(255,255,255,0.1)', flexBasis: '100px', flexGrow: 0 }}>Dismiss</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {isEndpointModalOpen && (
+          <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center">
+            <div className="panel pop-in max-w-2xl w-full mx-4" style={{ border: '1px solid #06b6d4', boxShadow: '0 0 30px rgba(6, 182, 212, 0.2)' }}>
+              <div className="flex justify-between items-center mb-4 border-b border-slate-700 pb-2">
+                <h2 className="text-cyan-400 font-mono font-bold">LIVE ENDPOINT TELEMETRY</h2>
+                <button className="text-slate-400 hover:text-white cursor-pointer" onClick={() => setIsEndpointModalOpen(false)}>
+                  <X size={20} />
+                </button>
+              </div>
+
+              {securedEndpoints.length === 0 ? (
+                <div className="text-slate-400 font-mono text-sm py-8 text-center italic">
+                  Awaiting live endpoint telemetry...
+                </div>
+              ) : (
+                <div className="overflow-x-auto max-h-96 overflow-y-auto">
+                  <table className="w-full text-left font-mono text-sm">
+                    <thead className="bg-slate-800/50 text-slate-300 sticky top-0">
+                      <tr>
+                        <th className="py-2 px-4 border-b border-slate-700">IP Address</th>
+                        <th className="py-2 px-4 border-b border-slate-700">MAC Address</th>
+                        <th className="py-2 px-4 border-b border-slate-700">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {securedEndpoints.map((ep, idx) => {
+                        const isRouter = ep.ip === '192.168.0.1' || ep.ip === '192.168.1.1';
+                        const isGateway = ep.ip.includes('127.0.0.1');
+                        
+                        let statusClass = "bg-green-900/30 text-green-400 border-green-800/50";
+                        let displayText = ep.status || 'SECURED';
+                        let icon = "📱";
+
+                        if (isRouter) {
+                          statusClass = "bg-amber-950/30 text-amber-500 border-amber-900/50";
+                          displayText = "INFRASTRUCTURE (Router)";
+                          icon = "📡";
+                        } else if (isGateway) {
+                          statusClass = "bg-cyan-950/30 text-cyan-400 border-cyan-900/50";
+                          icon = "💻";
+                        }
+                        
+                        return (
+                          <tr key={idx} className="border-b border-slate-800 hover:bg-slate-800/30">
+                            <td className="py-2 px-4 text-cyan-400">
+                              <div className="flex items-center gap-2">
+                                <span>{icon}</span>
+                                <span>{ep.ip || 'Unknown'}</span>
+                              </div>
+                            </td>
+                            <td className="py-2 px-4 text-slate-400">{ep.mac || 'Unknown'}</td>
+                            <td className="py-2 px-4">
+                              <span className={`px-2 py-0.5 rounded text-xs border ${statusClass}`}>
+                                {displayText}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <div className="mt-4 flex justify-end">
+                <button className="action-btn" onClick={() => setIsEndpointModalOpen(false)}>Close</button>
               </div>
             </div>
           </div>
