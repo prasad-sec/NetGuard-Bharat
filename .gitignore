@@ -13,4 +13,6 @@ env/
 .DS_Store
 Thumbs.db
 
-# Screenshots
+# Logs & Generated Artifacts
+*.log
+*.pdf
