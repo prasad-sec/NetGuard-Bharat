@@ -91,7 +91,7 @@ def tail_and_analyze(file_path):
 
 if __name__ == "__main__":
     print("=================================================")
-    print("🚀 DEEP PACKET AI - BEHAVIORAL ENGINE STARTED 🚀")
+    print(" DEEP PACKET AI - BEHAVIORAL ENGINE STARTED ")
     print("=================================================")
     try:
         tail_and_analyze(LOG_FILE)

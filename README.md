@@ -34,7 +34,8 @@ The project is built to help identify anomalous outbound traffic, track where lo
 
 ### 📄 Threat Report Exporter
 *   Generates clean, professional PDF reports on-demand using `jsPDF` and `jspdf-autotable`.
-*   Includes dark-styled tables, automated tricolour accent margins, and distinct rows highlighting active threats.
+*   Includes a soft-white readable background with premium dark slate text, mapped full country names, automated tricolour accent margins, and styled dynamic row badges highlighting active threats.
+*   Enforces accurate, localized timestamps and strict reverse-chronological sorting to guarantee complete log fidelity.
 
 ### 🐍 Packet Capture & Behavioral Analysis
 *   `enterprise_tap.py`: A Python script using `scapy` to capture raw network packets in promiscuous mode (requires Administrator rights).

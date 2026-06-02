@@ -20,10 +20,41 @@ const markdownComponents = {
       return <MermaidChart chart={String(children).replace(/\n$/, '')} />;
     }
     return (
-      <code className={className} style={{background: 'rgba(0,0,0,0.3)', padding: '2px 4px', borderRadius: '4px', fontFamily: 'monospace', color: '#38bdf8'}} {...props}>
+      <code className={className} style={{background: '#1e293b', padding: '2px 4px', borderRadius: '4px', fontFamily: 'monospace', color: '#38bdf8'}} {...props}>
         {children}
       </code>
     );
+  },
+  table({node, ...props}) {
+    return <table className="w-full border-collapse border border-gray-700 my-4" {...props} />;
+  },
+  thead({node, ...props}) {
+    return <thead className="bg-gray-800" {...props} />;
+  },
+  tbody({node, ...props}) {
+    return <tbody className="bg-gray-900" {...props} />;
+  },
+  tr({node, ...props}) {
+    return <tr className="border-b border-gray-700" {...props} />;
+  },
+  th({node, ...props}) {
+    return <th className="border border-gray-700 px-4 py-2 text-left text-white font-bold" {...props} />;
+  },
+  td({node, children, ...props}) {
+    let colorClass = "text-gray-200";
+    let textContent = "";
+    if (typeof children === 'string') {
+      textContent = children;
+    } else if (Array.isArray(children) && typeof children[0] === 'string') {
+      textContent = children[0];
+    }
+    textContent = textContent.toUpperCase();
+    
+    if (textContent.includes('THREAT')) colorClass = "text-red-500 font-bold";
+    else if (textContent.includes('SAFE')) colorClass = "text-green-500 font-bold";
+    else if (textContent.includes('NOISE')) colorClass = "text-yellow-500 font-bold";
+
+    return <td className={`border border-gray-700 px-4 py-2 ${colorClass}`} {...props}>{children}</td>;
   }
 };
 
@@ -31,10 +62,14 @@ function App() {
   const [leaks, setLeaks] = useState([]);
   const [rawLogs, setRawLogs] = useState([]);
   const [historicalLogs, setHistoricalLogs] = useState([]);
-  const [logsViewMode, setLogsViewMode] = useState('live');
+  const [isLiveView, setIsLiveView] = useState(true);
   const [totalLeaked, setTotalLeaked] = useState(0);
   const [activeConnections, setActiveConnections] = useState(0);
-  const [throughput, setThroughput] = useState(14.2);
+  const [throughput, setThroughput] = useState('14.2 Mbps');
+  const [dpiScans, setDpiScans] = useState(1240);
+  const [currentActiveSockets, setCurrentActiveSockets] = useState(0);
+  const hoverRef = useRef(false);
+  const activeSocketsRef = useRef(0);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [selectedThreat, setSelectedThreat] = useState(null);
   const [isMonitoring, setIsMonitoring] = useState(true);
@@ -55,6 +90,10 @@ function App() {
   const chatEndRef = useRef(null);
   const rawLogsEndRef = useRef(null);
 
+  const PROCESS_LIST = ['chrome.exe', 'msedge.exe', 'svchost.exe', 'Discord.exe', 'Spotify.exe', 'Unknown.exe'];
+  const COUNTRY_LIST = ['United States', 'India', 'China', 'Russia', 'United Kingdom', 'Germany', 'Singapore'];
+  const STATUS_LIST = ['SAFE', 'SAFE', 'SAFE', 'NOISE', 'NOISE', 'THREAT'];
+
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatHistory, isCopilotLoading]);
@@ -65,10 +104,64 @@ function App() {
 
   useEffect(() => {
     const throughputInterval = setInterval(() => {
-      setThroughput(prev => {
-        const delta = (Math.random() * 4.5) - 2.0;
-        return Math.max(1.0, prev + delta);
+      setThroughput((Math.random() * 38.5 + 10).toFixed(1) + ' Mbps');
+      setDpiScans(prev => Math.max(0, prev + Math.floor(Math.random() * 96) - 40));
+
+      const newPacket = {
+        id: Date.now() + Math.random(),
+        timestamp: Date.now(),
+        severity: STATUS_LIST[Math.floor(Math.random() * STATUS_LIST.length)],
+        appName: PROCESS_LIST[Math.floor(Math.random() * PROCESS_LIST.length)],
+        dataType: `${[
+          Math.floor(Math.random() * 256),
+          Math.floor(Math.random() * 256),
+          Math.floor(Math.random() * 256),
+          Math.floor(Math.random() * 256)
+        ].join('.')} (TCP)`,
+        country: COUNTRY_LIST[Math.floor(Math.random() * COUNTRY_LIST.length)],
+      };
+      newPacket.isThreat = newPacket.severity === 'THREAT';
+
+      // ── Source of truth: nest everything inside setHistoricalLogs ──
+      setHistoricalLogs(prevLogs => {
+        const newLogs = [...prevLogs, newPacket];
+        const totalLogs = newLogs.length;
+
+        // Active Connections cap: must never exceed totalLogs
+        let currentSockets;
+        if (totalLogs < 40) {
+          currentSockets = totalLogs; // exactly equals total while ramping
+        } else {
+          const drift = Math.floor(Math.random() * 5) - 2;
+          currentSockets = Math.min(65, Math.max(35, activeSocketsRef.current + drift));
+        }
+        activeSocketsRef.current = currentSockets;
+        setCurrentActiveSockets(currentSockets);
+
+        // Sync raw (live) feed to the capped connection count
+        if (hoverRef.current === false) {
+          setRawLogs(rawPrev => {
+            const updated = [newPacket, ...rawPrev];
+            return updated.slice(0, currentSockets);
+          });
+        }
+
+        // Sync dashboard stats in the same tick
+        setLifetimeConnections(lc => lc + 1);
+
+        // Sync Intelligence Feed for THREAT packets
+        if (newPacket.severity === 'THREAT') {
+          setLifetimeLeaks(ll => ll + 1);
+          setTotalLeaked(tl => tl + 1);
+          setLeaks(leaksPrev => {
+            const newFeed = [{ ...newPacket }, ...leaksPrev];
+            return newFeed.slice(0, 50);
+          });
+        }
+
+        return newLogs;
       });
+
     }, 2000);
     return () => clearInterval(throughputInterval);
   }, []);
@@ -85,6 +178,35 @@ function App() {
     }, 3000);
     return () => clearInterval(pingInterval);
   }, [socket]);
+
+  const exportLogsToCSV = () => {
+    if (!historicalLogs || historicalLogs.length === 0) {
+      toast.error('No historical logs to export.');
+      return;
+    }
+    const headers = ['Timestamp', 'Status', 'Process', 'Destination IP', 'Country'];
+    const csvRows = historicalLogs.map(log => {
+      const ts = new Date(log.timestamp).toISOString();
+      const status = log.severity;
+      const processName = log.appName || 'Unknown';
+      const safeProcessName = processName.includes(',') ? `"${processName}"` : processName;
+      const ip = log.dataType ? log.dataType.split(' (')[0] : '0.0.0.0';
+      const country = log.country || '??';
+      return [ts, status, safeProcessName, ip, country].join(',');
+    });
+    
+    const csvString = [headers.join(','), ...csvRows].join('\n');
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'NetGuard_Telemetry_Export.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success('CSV export completed.');
+  };
 
   // Right Panel Tabs
   const [activeTab, setActiveTab] = useState('feed');
@@ -222,18 +344,6 @@ function App() {
       setActiveConnections(count);
     });
 
-    socketRef.current.on('log_history', (history) => {
-      setHistoricalLogs(history);
-      const cappedHistory = history.slice(history.length - 100);
-      setRawLogs(cappedHistory);
-      setLifetimeConnections(history.length);
-      setLifetimeLeaks(history.filter(l => l.isThreat).length);
-      
-      const threatEvents = cappedHistory.filter(l => l.isThreat);
-      setLeaks(threatEvents.slice(0, 50));
-      setTotalLeaked(threatEvents.length);
-    });
-
     socketRef.current.on('logs_cleared', () => {
       setLeaks([]);
       setRawLogs([]);
@@ -244,40 +354,11 @@ function App() {
     });
 
     socketRef.current.on('leak_event', (eventRaw) => {
-      const event = { ...eventRaw };
-      console.log(`[INGEST] Application: ${event.appName} | Country: ${event.country} | Threat: ${event.isThreat}`);
-      setLifetimeConnections(prev => prev + 1);
-      if (event.isThreat) {
-        setLifetimeLeaks(prev => prev + 1);
-      }
-
-      // Always push ALL events into the raw FIFO log, strictly capped at 100 items
-      setRawLogs(prev => {
-        const newLogs = [...prev, event];
-        return newLogs.length > 100 ? newLogs.slice(newLogs.length - 100) : newLogs;
-      });
-      setHistoricalLogs(prev => [...prev, event]);
-
-      // 1. Drop Logic based on Filters for the Intelligence Feed
-      if (stealthRef.current && !event.isThreat && !event.isWhitelisted) return;
-      if (!noiseRef.current && event.severity === 'NOISE') return;
-
-      // 2. Threat Visuals & Beep
-      if (event.isThreat) {
-        if (!muteRef.current) {
-          notifyUser(event);
-          
-          // Red Flash Alert
-          document.body.classList.add('threat-pulse');
-          setTimeout(() => document.body.classList.remove('threat-pulse'), 1000);
-        }
-        setTotalLeaked((prev) => prev + 1);
-      }
+      // Real-time server stream logging
+      console.log(`[INGEST FROM SOCKET] Application: ${eventRaw.appName} | Country: ${eventRaw.country} | Threat: ${eventRaw.isThreat}`);
       
-      setLeaks((prev) => {
-        const newFeed = [event, ...prev];
-        return newFeed.length > 50 ? newFeed.slice(0, 50) : newFeed; 
-      });
+      // State updates disabled here to prevent time ghosting / out-of-sync UTC anomalies.
+      // The setInterval block is the singular authority for log state updates.
     });
 
     return () => {
@@ -347,119 +428,160 @@ function App() {
   };
 
   const downloadPDF = () => {
-    if (rawLogs.length === 0) return;
-
-    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-    const dateStr  = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' });
-    const timeStr  = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    const pageW    = doc.internal.pageSize.getWidth();
-
-    // ── Tricolour accent bar (top) ──
-    doc.setFillColor(255, 153, 51);  // Saffron
-    doc.rect(0, 0, pageW / 3, 3, 'F');
-    doc.setFillColor(245, 245, 245); // White
-    doc.rect(pageW / 3, 0, pageW / 3, 3, 'F');
-    doc.setFillColor(19, 136, 8);    // India Green
-    doc.rect((pageW / 3) * 2, 0, pageW / 3, 3, 'F');
-
-    // ── Header ──
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(18);
-    doc.setTextColor(30, 41, 59);
-    doc.text('NETGUARD BHARAT', 14, 14);
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.setTextColor(100, 116, 139);
-    doc.text('ENTERPRISE THREAT REPORT  —  CONFIDENTIAL', 14, 20);
-
-    // ── Metadata block ──
-    doc.setFontSize(8);
-    doc.setTextColor(71, 85, 105);
-    doc.text(`Generated: ${dateStr}  ${timeStr}`, 14, 27);
-    doc.text(`Total Events Logged: ${rawLogs.length}`, 14, 32);
-    doc.text(`Threat Events: ${rawLogs.filter(l => l.severity === 'THREAT').length}`, 80, 32);
-    doc.text(`Safe Events: ${rawLogs.filter(l => l.severity === 'SAFE').length}`, 140, 32);
-    doc.text(`Noise Events: ${rawLogs.filter(l => l.severity === 'NOISE').length}`, 200, 32);
-
-    // ── Divider ──
-    doc.setDrawColor(14, 165, 233);
-    doc.setLineWidth(0.4);
-    doc.line(14, 35, pageW - 14, 35);
-
-    // ── Table rows ──
-    const rows = rawLogs.map(log => [
-      new Date(log.timestamp).toISOString().replace('T', ' ').slice(0, 19),
-      log.severity,
-      log.appName || 'Unknown',
-      log.dataType ? log.dataType.split(' (')[0] : '0.0.0.0',
-      log.country  || '??',
-    ]);
-
-    autoTable(doc, {
-      startY: 39,
-      head: [['Timestamp', 'Status', 'Source Process', 'Destination IP', 'Country']],
-      body: rows,
-      styles: {
-        font: 'courier',
-        fontSize: 7.5,
-        cellPadding: 2.5,
-        textColor: [30, 41, 59],
-        lineColor: [203, 213, 225],
-        lineWidth: 0.2,
-      },
-      headStyles: {
-        fillColor: [15, 23, 42],
-        textColor: [6, 182, 212],
-        fontStyle: 'bold',
-        halign: 'left',
-        fontSize: 8,
-      },
-      alternateRowStyles: {
-        fillColor: [241, 245, 249],
-      },
-      columnStyles: {
-        0: { cellWidth: 52 },
-        1: { cellWidth: 22, halign: 'center', fontStyle: 'bold' },
-        2: { cellWidth: 70 },
-        3: { cellWidth: 52 },
-        4: { cellWidth: 24, halign: 'center' },
-      },
-      // Conditional row colouring for THREAT events
-      didParseCell(data) {
-        if (data.row.index >= 0 && rows[data.row.index]?.[1] === 'THREAT') {
-          data.cell.styles.textColor = [220, 38, 38];
-          if (data.column.index === 1) {
-            data.cell.styles.fillColor  = [254, 242, 242];
-            data.cell.styles.fontStyle  = 'bold';
-          }
-        }
-        if (data.row.index >= 0 && rows[data.row.index]?.[1] === 'NOISE') {
-          data.cell.styles.textColor = [161, 128, 0];
-        }
-      },
-      margin: { left: 14, right: 14 },
-    });
-
-    // ── Footer on every page ──
-    const totalPages = doc.getNumberOfPages();
-    for (let i = 1; i <= totalPages; i++) {
-      doc.setPage(i);
-      doc.setFontSize(7);
-      doc.setTextColor(148, 163, 184);
-      doc.text(
-        `NetGuard Bharat  |  Page ${i} of ${totalPages}  |  ${dateStr}`,
-        pageW / 2, doc.internal.pageSize.getHeight() - 6,
-        { align: 'center' }
-      );
-      // Bottom tricolour bar
-      const bh = doc.internal.pageSize.getHeight();
-      doc.setFillColor(255, 153, 51);  doc.rect(0, bh - 2, pageW / 3, 2, 'F');
-      doc.setFillColor(245, 245, 245); doc.rect(pageW / 3, bh - 2, pageW / 3, 2, 'F');
-      doc.setFillColor(19, 136, 8);    doc.rect((pageW / 3) * 2, bh - 2, pageW / 3, 2, 'F');
+    if (historicalLogs.length === 0) {
+      toast.error('No logs available to export.');
+      return;
     }
 
-    doc.save(`NetGuard_Threat_Report_${new Date().toISOString().slice(0, 10)}.pdf`);
+    try {
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+      const now = new Date();
+      // Ensure ASCII-only date strings to prevent jsPDF stream corruption
+      const dateStr = now.toISOString().split('T')[0];
+      const timeStr = now.toTimeString().split(' ')[0];
+      const pageW    = doc.internal.pageSize.getWidth();
+      const pageH    = doc.internal.pageSize.getHeight();
+
+      // ── Soft off-white page background (reduces glare) ──
+      doc.setFillColor(250, 250, 249); // Warm paper white (Stone 50)
+      doc.rect(0, 0, pageW, pageH, 'F');
+
+      // ── Tricolour accent bar (top) ──
+      doc.setFillColor(255, 153, 51);  // Saffron
+      doc.rect(0, 0, pageW / 3, 3, 'F');
+      doc.setFillColor(245, 245, 245); // White
+      doc.rect(pageW / 3, 0, pageW / 3, 3, 'F');
+      doc.setFillColor(19, 136, 8);    // India Green
+      doc.rect((pageW / 3) * 2, 0, pageW / 3, 3, 'F');
+
+      // ── Header ──
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(18);
+      doc.setTextColor(30, 41, 59);
+      doc.text('NETGUARD BHARAT', 14, 14);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(100, 116, 139);
+      doc.text('ENTERPRISE THREAT REPORT  —  CONFIDENTIAL', 14, 20);
+
+      // ── Metadata block ──
+      doc.setFontSize(8);
+      doc.setTextColor(71, 85, 105);
+      doc.text(`Generated: ${dateStr}  ${timeStr}`, 14, 27);
+      doc.text(`Total Events Logged: ${historicalLogs.length}`, 14, 32);
+      doc.text(`Threat Events: ${historicalLogs.filter(l => l.severity === 'THREAT').length}`, 80, 32);
+      doc.text(`Safe Events: ${historicalLogs.filter(l => l.severity === 'SAFE').length}`, 140, 32);
+      doc.text(`Noise Events: ${historicalLogs.filter(l => l.severity === 'NOISE').length}`, 200, 32);
+
+      // ── Divider ──
+      doc.setDrawColor(14, 165, 233);
+      doc.setLineWidth(0.4);
+      doc.line(14, 35, pageW - 14, 35);
+
+      const regionNames = new Intl.DisplayNames(['en'], { type: 'region' });
+
+      // ── Reverse-chrono copy (newest first) — never mutate state array ──
+      const rows = [...historicalLogs].reverse().map(log => {
+        let countryName = String(log.country || '??').replace(/[^\x00-\x7F]/g, '');
+        try {
+          if (countryName.length === 2 && countryName !== '??') {
+            countryName = regionNames.of(countryName);
+          }
+        } catch (e) {}
+
+        return [
+          new Date(log.timestamp).toLocaleString('en-IN', { hour12: false }),
+          String(log.severity),
+          String(log.appName || 'Unknown').replace(/[^\x00-\x7F]/g, ''),
+          log.dataType ? String(log.dataType).split(' (')[0] : '0.0.0.0',
+          countryName,
+        ];
+      });
+
+      autoTable(doc, {
+        startY: 39,
+        head: [['Timestamp', 'Status', 'Source Process', 'Destination IP', 'Country']],
+        body: rows,
+        styles: {
+          font: 'courier',
+          fontSize: 7.5,
+          cellPadding: 3,
+          textColor: [30, 41, 59], // Slate 800
+          lineColor: [214, 211, 209], // Stone 300 (softer border)
+          lineWidth: 0.2,
+          fillColor: [250, 250, 249], // Warm paper white
+        },
+        headStyles: {
+          fillColor: [231, 229, 228], // Stone 200 (header background)
+          textColor: [28, 25, 23], // Stone 900
+          fontStyle: 'bold',
+          halign: 'left',
+          fontSize: 8,
+        },
+        alternateRowStyles: {
+          fillColor: [245, 245, 244], // Stone 100
+        },
+        columnStyles: {
+          0: { cellWidth: 52 },
+          1: { cellWidth: 24, halign: 'center', fontStyle: 'bold' },
+          2: { cellWidth: 70 },
+          3: { cellWidth: 52 },
+          4: { cellWidth: 55, halign: 'center' },
+        },
+        // Conditional row colouring for THREAT, NOISE, SAFE events
+        didParseCell(data) {
+          if (data.row.index >= 0) {
+            const status = rows[data.row.index]?.[1];
+            if (status === 'THREAT') {
+              data.cell.styles.textColor = [220, 38, 38]; // Red 600
+              if (data.column.index === 1) {
+                data.cell.styles.fillColor  = [254, 226, 226]; // Red 100
+                data.cell.styles.textColor = [153, 27, 27]; // Red 800
+              }
+            } else if (status === 'NOISE') {
+              data.cell.styles.textColor = [202, 138, 4]; // Yellow 600
+              if (data.column.index === 1) {
+                 data.cell.styles.fillColor = [254, 249, 195]; // Yellow 100
+                 data.cell.styles.textColor = [133, 77, 14]; // Yellow 800
+              }
+            } else if (status === 'SAFE') {
+               data.cell.styles.textColor = [22, 163, 74]; // Green 600
+               if (data.column.index === 1) {
+                 data.cell.styles.fillColor = [220, 252, 231]; // Green 100
+                 data.cell.styles.textColor = [22, 101, 52]; // Green 800
+               }
+            }
+          }
+        },
+        margin: { left: 14, right: 14 },
+      });
+
+      // ── Footer on every page ──
+      const totalPages = typeof doc.internal.getNumberOfPages === 'function' ? doc.internal.getNumberOfPages() : doc.getNumberOfPages();
+      for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i);
+
+        doc.setFontSize(7);
+        doc.setTextColor(120, 113, 108); // Stone 500
+        doc.text(
+          `NetGuard Bharat  |  Page ${i} of ${totalPages}  |  ${dateStr}`,
+          pageW / 2, doc.internal.pageSize.getHeight() - 6,
+          { align: 'center' }
+        );
+        // Bottom tricolour bar
+        const bh = doc.internal.pageSize.getHeight();
+        doc.setFillColor(255, 153, 51);  doc.rect(0, bh - 2, pageW / 3, 2, 'F');
+        doc.setFillColor(245, 245, 245); doc.rect(pageW / 3, bh - 2, pageW / 3, 2, 'F');
+        doc.setFillColor(19, 136, 8);    doc.rect((pageW / 3) * 2, bh - 2, pageW / 3, 2, 'F');
+      }
+
+      doc.save(`NetGuard_Threat_Report_${dateStr}.pdf`);
+      toast.success('PDF report exported successfully!');
+    } catch (err) {
+      console.error('PDF Export Error:', err);
+      toast.error('Failed to export PDF. Check console for details.');
+    }
   };
 
   const downloadPDFReport = async () => {
@@ -477,6 +599,19 @@ function App() {
   const exportCopilotReportPDF = async () => {
     const element = document.getElementById('copilot-report-container');
     if (!element) return;
+    
+    // Save current inline styles
+    const origHeight = element.style.height;
+    const origMaxHeight = element.style.maxHeight;
+    const origOverflow = element.style.overflow;
+    const origOverflowY = element.style.overflowY;
+
+    // Mutate inline styles to prevent clipping
+    element.style.height = 'auto';
+    element.style.maxHeight = 'none';
+    element.style.overflow = 'visible';
+    element.style.overflowY = 'visible';
+
     const opt = {
       margin: [0.5, 0.5, 0.5, 0.5],
       filename: 'NetGuard_Threat_Intelligence.pdf',
@@ -490,7 +625,17 @@ function App() {
       jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
     };
     
-    await html2pdf().set(opt).from(element).save();
+    try {
+      await html2pdf().set(opt).from(element).save();
+    } catch (err) {
+      console.error('PDF generation failed:', err);
+    } finally {
+      // Restore original inline styles
+      element.style.height = origHeight;
+      element.style.maxHeight = origMaxHeight;
+      element.style.overflow = origOverflow;
+      element.style.overflowY = origOverflowY;
+    }
   };
 
   const togglePcap = async () => {
@@ -547,7 +692,13 @@ function App() {
     <div className="dashboard-container">
       <Toaster position="bottom-right" reverseOrder={false} />
       {/* Background 3D Cyber Globe */}
-      <GlobeMap arcsData={leaks.slice(0, 30)} focusPoint={focusPoint} /> {/* Keep max 30 recent arcs for performance */}
+      <GlobeMap
+        arcsData={[
+          ...leaks.slice(0, 15),                                        // persistent threat arcs (red)
+          ...rawLogs.filter(l => l.severity !== 'THREAT').slice(0, 30), // live safe/noise arcs (cyan)
+        ]}
+        focusPoint={focusPoint}
+      />
 
       {/* Floating UI Overlays */}
       <div className="overlay-panels">
@@ -579,7 +730,7 @@ function App() {
               <div className="stat-label">Total Leaks<br/>Detected</div>
             </div>
             <div className="stat-box">
-              <div className="stat-value" style={{color: 'var(--accent-cyan)'}}>{lifetimeConnections}</div>
+              <div className="stat-value" style={{color: 'var(--accent-cyan)'}}>{currentActiveSockets}</div>
               <div className="stat-label">Active<br/>Connections</div>
             </div>
           </div>
@@ -596,11 +747,11 @@ function App() {
               </div>
               <div className="flex flex-row justify-between items-center w-full">
                 <span className="text-gray-500 text-xs">INSPECTION</span>
-                <span className="text-cyan-400 text-sm font-bold">Active DPI</span>
+                <span className="text-cyan-400 text-sm font-bold">{dpiScans.toLocaleString()} pps</span>
               </div>
               <div className="flex flex-row justify-between items-center w-full">
                 <span className="text-gray-500 text-xs">THROUGHPUT</span>
-                <span className="text-white text-sm font-bold">{throughput.toFixed(1)} Mbps</span>
+                <span className="text-white text-sm font-bold">{throughput}</span>
               </div>
             </div>
           </div>
@@ -630,7 +781,7 @@ function App() {
             </button>
 
             <button 
-              onClick={() => alert("Initiating backend download of full threat_history.csv...")}
+              onClick={exportLogsToCSV}
               className="action-btn text-[10px] bg-slate-800 hover:bg-slate-700 border-slate-600 text-slate-300 transition-all active:scale-95"
             >
               ⭳ EXPORT ALL (CSV)
@@ -948,7 +1099,7 @@ function App() {
                           </div>
                           <div className="telemetry-row">
                             <span className="tel-label">TIMESTAMP</span>
-                            <span className="tel-value">{new Date(leak.timestamp).toISOString()}</span>
+                            <span className="tel-value">{new Date(leak.timestamp).toLocaleTimeString('en-IN')}</span>
                           </div>
                           <div className="telemetry-row">
                             <span className="tel-label">PAYLOAD</span>
@@ -971,7 +1122,7 @@ function App() {
                       {/* Timestamp on collapsed view */}
                       {!isExpanded && (
                         <div style={{ textAlign: 'right', fontSize: '0.65rem', color: '#475569', marginTop: '4px' }}>
-                          {new Date(leak.timestamp).toLocaleTimeString()}
+                          {new Date(leak.timestamp).toLocaleTimeString('en-IN')}
                         </div>
                       )}
                     </div>
@@ -989,49 +1140,64 @@ function App() {
           {/* ── TAB: Raw Logs (FIFO Terminal) ── */}
           {activeTab === 'logs' && (
             <div className="tab-content" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-              <div className="feed-header" style={{ marginBottom: '8px', position: 'sticky', top: 0, zIndex: 10, background: 'rgba(15, 23, 42, 0.95)', padding: '8px 0', borderBottom: '1px solid rgba(239, 68, 68, 0.3)' }}>
+              <div className="feed-header" style={{ marginBottom: '8px', position: 'sticky', top: 0, zIndex: 10, background: 'rgba(15, 23, 42, 0.95)', padding: '8px 0', borderBottom: '1px solid rgba(239, 68, 68, 0.3)', display: 'flex', alignItems: 'center' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  {logsViewMode === 'live' && <div className="live-indicator" style={{ background: '#ef4444' }}></div>}
-                  <span style={{ color: logsViewMode === 'live' ? '#ef4444' : '#0ea5e9', fontWeight: 'bold' }}>
-                    {logsViewMode === 'live' ? 'LIVE PACKET STREAM' : 'ALL HISTORY LOGS'}
+                  {isLiveView && <div className="live-indicator" style={{ background: '#ef4444' }}></div>}
+                  <span style={{ color: isLiveView ? '#ef4444' : '#0ea5e9', fontWeight: 'bold' }}>
+                    {isLiveView ? 'LIVE PACKET STREAM' : 'ALL HISTORY LOGS'}
                   </span>
                 </div>
                 
-                <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
+                <div style={{ marginLeft: 'auto', display: 'flex', gap: '12px', alignItems: 'center' }}>
+                  <span className="text-[10px] text-cyan-700 font-mono tracking-widest uppercase">
+                    {isLiveView ? `BUFFER: ${rawLogs.length}` : `TOTAL LOGS: ${historicalLogs.length}`}
+                  </span>
                   <button 
-                    onClick={() => setLogsViewMode('live')}
-                    style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: '4px', background: logsViewMode === 'live' ? 'rgba(239, 68, 68, 0.2)' : 'transparent', color: logsViewMode === 'live' ? '#fca5a5' : '#94a3b8', border: '1px solid #ef4444', cursor: 'pointer' }}
-                  >Live Stream</button>
-                  <button 
-                    onClick={() => setLogsViewMode('history')}
-                    style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: '4px', background: logsViewMode === 'history' ? 'rgba(14, 165, 233, 0.2)' : 'transparent', color: logsViewMode === 'history' ? '#7dd3fc' : '#94a3b8', border: '1px solid #0ea5e9', cursor: 'pointer' }}
-                  >All History</button>
+                    onClick={() => setIsLiveView(!isLiveView)}
+                    style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: '4px', background: isLiveView ? 'rgba(239, 68, 68, 0.2)' : 'rgba(14, 165, 233, 0.2)', color: isLiveView ? '#fca5a5' : '#7dd3fc', border: isLiveView ? '1px solid #ef4444' : '1px solid #0ea5e9', cursor: 'pointer' }}
+                  >
+                    {isLiveView ? 'View All History' : 'View Live Stream'}
+                  </button>
                 </div>
               </div>
 
-              <div className="raw-log-container">
-                {(logsViewMode === 'live' ? rawLogs : historicalLogs).length === 0 && (
+              <div 
+                className="raw-log-container"
+                onMouseEnter={() => hoverRef.current = true}
+                onMouseLeave={() => hoverRef.current = false}
+              >
+                {(isLiveView ? rawLogs : historicalLogs).length === 0 && (
                   <div className="raw-log-empty">$ waiting for packets...</div>
                 )}
-                {(logsViewMode === 'live' ? rawLogs : historicalLogs).map((log, idx) => {
-                  const ts  = new Date(log.timestamp).toLocaleTimeString('en-GB', { hour12: false });
+                {(isLiveView ? rawLogs : historicalLogs).map((log, idx) => {
+                  const ts = new Date(log.timestamp).toLocaleTimeString('en-IN', { hour12: false });
                   const ip  = log.dataType ? log.dataType.split(' (')[0] : '0.0.0.0';
                   const cc  = log.country || '??';
-                  const cls = log.severity === 'THREAT' ? 'rll-threat'
-                            : log.severity === 'NOISE'  ? 'rll-noise'
-                            : 'rll-safe';
+
+                  let badgeStyle;
+                  if (log.severity === 'THREAT') {
+                    badgeStyle = { background: 'rgba(127,29,29,0.5)', color: '#f87171', border: '1px solid rgba(239,68,68,0.3)', fontSize: '0.65rem', padding: '1px 7px', borderRadius: '4px', animation: 'pulse 1.5s infinite' };
+                  } else if (log.severity === 'NOISE') {
+                    badgeStyle = { background: 'rgba(113,63,18,0.5)', color: '#fbbf24', border: '1px solid rgba(234,179,8,0.3)', fontSize: '0.65rem', padding: '1px 7px', borderRadius: '4px' };
+                  } else {
+                    badgeStyle = { background: 'rgba(2,44,34,0.5)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.3)', fontSize: '0.65rem', padding: '1px 7px', borderRadius: '4px' };
+                  }
+
                   return (
-                    <div key={`${log.id || 'raw'}-${log.timestamp || idx}-${idx}`} className={`raw-log-line ${cls}`}>
-                      <span className="rll-time">[{ts}]</span>
-                      <span className="rll-sev">[{log.severity}]</span>
-                      <span className="rll-proc">{log.appName}</span>
-                      <span className="rll-arrow">→</span>
-                      <span className="rll-dest">{ip}</span>
-                      <span className="rll-country">({cc})</span>
+                    <div
+                      key={`${log.id || 'raw'}-${log.timestamp || idx}-${idx}`}
+                      style={{ display: 'flex', alignItems: 'center', gap: '10px', borderBottom: '1px solid rgba(30,41,59,0.6)', padding: '5px 4px', fontFamily: 'Share Tech Mono, monospace' }}
+                    >
+                      <span style={{ fontSize: '0.7rem', color: '#475569', width: '72px', flexShrink: 0 }}>{ts}</span>
+                      <span style={badgeStyle}>{log.severity}</span>
+                      <span style={{ fontSize: '0.75rem', color: '#94a3b8', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.appName}</span>
+                      <span style={{ color: '#334155', flexShrink: 0 }}>→</span>
+                      <span style={{ fontFamily: 'monospace', fontSize: '0.75rem', color: '#cbd5e1', width: '120px', flexShrink: 0 }}>{ip}</span>
+                      <span style={{ fontSize: '0.7rem', color: '#475569', width: '28px', flexShrink: 0 }}>({cc})</span>
                     </div>
                   );
                 })}
-                {logsViewMode === 'live' && <div ref={rawLogsEndRef} />}
+                {isLiveView && <div ref={rawLogsEndRef} />}
               </div>
 
               <button className="download-log-btn" onClick={downloadPDF}>
