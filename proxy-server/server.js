@@ -83,6 +83,15 @@ function broadcastAndStoreLog(event) {
 
 const INDIA_CA = { lat: 21.0, lng: 78.0 }; // Default origin point for India
 
+// --- AUTHENTICATION ENDPOINT ---
+app.post('/api/auth/login', (req, res) => {
+  const { password } = req.body;
+  if (password === process.env.ADMIN_SECRET) {
+    return res.status(200).json({ success: true, message: "AUTH_GRANTED" });
+  }
+  return res.status(401).json({ success: false, error: "INVALID SECURITY TOKEN" });
+});
+
 // --- HISTORICAL EXPORT ENDPOINT ---
 app.post('/api/export/history', (req, res) => {
   const { startDate, endDate } = req.body;

@@ -73,7 +73,10 @@ function App() {
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [selectedThreat, setSelectedThreat] = useState(null);
   const [isMonitoring, setIsMonitoring] = useState(true);
-  const [loading, setLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isBooting, setIsBooting] = useState(false);
+  const [accessKey, setAccessKey] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
   const [focusPoint, setFocusPoint] = useState(null);
   const [latency, setLatency] = useState(0);
   const [socket, setSocket] = useState(null);
@@ -362,10 +365,6 @@ function App() {
     };
     document.addEventListener('click', handleInteraction);
 
-    const loadingTimeout = setTimeout(() => {
-      setLoading(false);
-    }, 3500);
-
     const socketObj = io(SOCKET_SERVER_URL);
     socketRef.current = socketObj;
     setSocket(socketObj);
@@ -396,7 +395,6 @@ function App() {
     });
 
     return () => {
-      clearTimeout(loadingTimeout);
       socketRef.current.disconnect();
     };
   }, []);
@@ -722,28 +720,77 @@ function App() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="loading-screen">
-        <div className="glitch-overlay"></div>
-        <div className="glitch-blocks">
-          <div className="glitch-block"></div>
-          <div className="glitch-block"></div>
-          <div className="glitch-block"></div>
-        </div>
-        <div className="loading-container">
-          <h1 className="marathi-title">आत्मनिर्भर भारत</h1>
-          <div className="glow-bar"></div>
-          <p className="loading-subtext">Initializing Secure Packet Ingestion...</p>
-        </div>
-      </div>
-    );
-  }
+  const handleVerification = async () => {
+    try {
+      const response = await fetch(`${SOCKET_SERVER_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ password: accessKey })
+      });
+
+      if (response.ok) {
+        setErrorMessage('');
+        setIsBooting(true);
+        setTimeout(() => {
+          setIsAuthenticated(true);
+        }, 1800);
+      } else {
+        setErrorMessage("SYSTEM ACCESS DENIED // INVALID SECURITY TOKEN");
+      }
+    } catch (error) {
+      setErrorMessage("SYSTEM OFFLINE // SERVER UNREACHABLE");
+    }
+  };
 
   const totalLeaks = totalLeaked;
 
   return (
-    <div className="dashboard-container">
+    <>
+      <div 
+        className={`fixed inset-0 z-50 flex flex-col items-center justify-center overflow-hidden transition-opacity duration-1000 ${isAuthenticated ? 'opacity-0 pointer-events-none' : 'opacity-100 bg-slate-950/90 backdrop-blur-md'}`}
+      >
+        <div className="absolute inset-0 z-0 h-full w-full bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:24px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]"></div>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -z-10 h-[400px] w-[600px] rounded-full bg-cyan-900/20 blur-[120px]"></div>
+
+        <div className="relative z-10 flex flex-col items-center w-full">
+          <h1 className="marathi-title">आत्मनिर्भर भारत</h1>
+          <div className="glow-bar"></div>
+        
+        <div className="h-32 flex flex-col items-center justify-start mt-4">
+          {!isBooting ? (
+            <div className="flex flex-col items-center">
+              <input
+                type="password"
+                placeholder="ENTER KEY"
+                value={accessKey}
+                onChange={(e) => setAccessKey(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleVerification(); }}
+                className="bg-transparent border-b border-slate-700 text-center text-white focus:outline-none focus:border-cyan-500 transition-colors tracking-[0.6em] text-lg font-mono placeholder-slate-600 w-64 py-2 my-4"
+              />
+              <button
+                onClick={handleVerification}
+                className="px-6 py-1.5 border border-cyan-500/40 bg-cyan-950/20 text-cyan-400 hover:bg-cyan-500 hover:text-black transition-all text-xs tracking-widest uppercase font-bold mt-2 rounded-sm shadow-[0_0_10px_rgba(6,182,212,0.1)]"
+              >
+                AUTHORIZE
+              </button>
+              {errorMessage && (
+                <div className="text-red-500 font-mono text-xs tracking-wider mt-2 uppercase animate-pulse">
+                  {errorMessage}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-cyan-400 font-mono text-xs tracking-wider mt-8 animate-pulse">
+              INITIALIZING SECURE PACKET INGESTION........
+            </div>
+          )}
+        </div>
+        </div>
+      </div>
+
+      <div className="dashboard-container">
       <Toaster position="bottom-right" reverseOrder={false} />
       {/* Background 3D Cyber Globe */}
       <GlobeMap
@@ -1439,6 +1486,7 @@ function App() {
 
       </div>
     </div>
+    </>
   );
 }
 

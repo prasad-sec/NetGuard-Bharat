@@ -114,9 +114,10 @@ To enable the interactive chatbot, you may configure the Local engine, the Cloud
 **For Cloud Inference (Gemini):**
 1. Generate a Gemini API Key via Google AI Studio.
 2. Create a `.env` configuration file within the `proxy-server` directory.
-3. Define the environment variable as follows:
+3. Define the environment variables as follows:
    ```env
    GEMINI_API_KEY="your-api-key-here"
+   ADMIN_SECRET="your-secure-password" # Used for the dashboard gatekeeper overlay
    ```
 
 *Note: The frontend dashboard operates independently with the Node backend (`server.js`). The Python packet tap and AI inference engines are modular extensions designed for advanced behavioral analysis.*
