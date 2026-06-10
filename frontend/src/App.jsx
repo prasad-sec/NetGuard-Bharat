@@ -111,6 +111,191 @@ function App() {
   const [aiEngine, setAiEngine] = useState('local');
   const chatEndRef = useRef(null);
   const rawLogsEndRef = useRef(null);
+  const reportRef = useRef(null);
+
+  const handleDownloadPDF = async () => {
+    const lastAiMessage = chatHistory.slice().reverse().find(m => m.role === 'ai');
+    if (!lastAiMessage || !lastAiMessage.text) return;
+
+    let rawText = lastAiMessage.text;
+    const reportDate = new Date().toLocaleString('en-IN', { dateStyle: 'full', timeStyle: 'short' });
+
+    // ── Step 1: Extract & Parse Mermaid Block ──
+    const mermaidMatch = rawText.match(/```mermaid\n([\s\S]*?)```/);
+    let mermaidTableHtml = '';
+    if (mermaidMatch) {
+      const mermaidSrc = mermaidMatch[1];
+      const connections = [...mermaidSrc.matchAll(/(\w+)\s*-->\|([^|]+)\|\s*(\w+)/g)];
+      const nodeLabelMap = {};
+      [...mermaidSrc.matchAll(/(\w+)\[["']?([^"'\]]+)["']?\]/g)].forEach(([, id, label]) => {
+        nodeLabelMap[id] = label;
+      });
+      if (connections.length > 0) {
+        const rows = connections.map(([, src, label, dst], i) => {
+          const srcLabel = nodeLabelMap[src] || src;
+          const dstLabel = nodeLabelMap[dst] || dst;
+          const isThreat = label.toUpperCase().includes('THREAT');
+          const rowBg = i % 2 === 0 ? '#ffffff' : '#f9f9f9';
+          const badge = isThreat
+            ? `<span style="background:#fee2e2;color:#b91c1c;padding:2px 8px;border-radius:4px;font-weight:bold;font-size:11px;">${label}</span>`
+            : `<span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:4px;font-weight:bold;font-size:11px;">${label}</span>`;
+          return `<tr style="background:${rowBg};">
+            <td style="padding:8px 12px;border:1px solid #e5e7eb;font-family:monospace;font-size:12px;">${srcLabel}</td>
+            <td style="padding:8px 12px;border:1px solid #e5e7eb;text-align:center;">${badge}</td>
+            <td style="padding:8px 12px;border:1px solid #e5e7eb;font-family:monospace;font-size:12px;">${dstLabel}</td>
+          </tr>`;
+        }).join('');
+        mermaidTableHtml = `
+          <div style="margin:24px 0;">
+            <h3 style="color:#1e3a5f;font-size:14px;font-weight:bold;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px;border-left:4px solid #1e3a5f;padding-left:10px;">Network Activity Visualization</h3>
+            <table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;font-size:13px;">
+              <thead>
+                <tr style="background:#1e3a5f;">
+                  <th style="padding:10px 12px;text-align:left;color:#ffffff;border:1px solid #1e3a5f;font-size:12px;">SOURCE PROCESS</th>
+                  <th style="padding:10px 12px;text-align:center;color:#ffffff;border:1px solid #1e3a5f;font-size:12px;">STATUS</th>
+                  <th style="padding:10px 12px;text-align:left;color:#ffffff;border:1px solid #1e3a5f;font-size:12px;">DESTINATION</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>`;
+      }
+      rawText = rawText.replace(/```mermaid\n[\s\S]*?```/, '[[MERMAID_PLACEHOLDER]]');
+    }
+
+    // ── Step 2: Convert Markdown to Enterprise HTML ──
+    rawText = rawText.replace(/```[a-z]*\n[\s\S]*?```/g, '');
+
+    const lines = rawText.split('\n');
+    let bodyHtml = '';
+    let inList = false;
+    let inThreatBlock = false;
+    let inTable = false;
+    let tableRows = [];
+
+    const flushList  = () => { if (inList)  { bodyHtml += '</ul>'; inList = false; } };
+    const flushTable = () => {
+      if (inTable && tableRows.length > 0) {
+        const [header, ...dataRows] = tableRows;
+        const headers = header.split('|').filter(c => c.trim() !== '');
+        bodyHtml += `<table style="width:100%;border-collapse:collapse;margin:16px 0;font-size:12px;font-family:Arial,sans-serif;">
+          <thead><tr style="background:#1e3a5f;">${headers.map(h => `<th style="padding:8px 10px;color:#fff;border:1px solid #1e3a5f;text-align:left;">${h.trim()}</th>`).join('')}</tr></thead>
+          <tbody>${dataRows.filter(r => !/^[\|\-\s]+$/.test(r)).map((r, i) => {
+            const cells = r.split('|').filter(c => c.trim() !== '');
+            const bg = i % 2 === 0 ? '#ffffff' : '#f3f4f6';
+            return `<tr style="background:${bg};">${cells.map(c => `<td style="padding:7px 10px;border:1px solid #e5e7eb;">${c.trim()}</td>`).join('')}</tr>`;
+          }).join('')}</tbody></table>`;
+        tableRows = [];
+        inTable = false;
+      }
+    };
+
+    for (let line of lines) {
+      if (line.trim() === '[[MERMAID_PLACEHOLDER]]') {
+        flushList(); flushTable();
+        bodyHtml += mermaidTableHtml;
+        continue;
+      }
+
+      // Table detection
+      if (line.trim().startsWith('|')) {
+        flushList();
+        inTable = true;
+        tableRows.push(line.trim());
+        continue;
+      } else if (inTable) {
+        flushTable();
+      }
+
+      // Threat callout detection (lines mentioning threat/alert/warning/malicious)
+      const isThreatLine = /threat|alert|malicious|exfiltrat|suspicious/i.test(line);
+
+      if (line.startsWith('### ')) {
+        flushList(); flushTable();
+        bodyHtml += `<h3 style="color:#1e3a5f;font-size:13px;font-weight:bold;text-transform:uppercase;letter-spacing:0.05em;margin:18px 0 6px;border-left:3px solid #3b82f6;padding-left:8px;">${line.replace(/^### /, '')}</h3>`;
+      } else if (line.startsWith('## ')) {
+        flushList(); flushTable();
+        bodyHtml += `<h2 style="color:#1e3a5f;font-size:15px;font-weight:bold;margin:22px 0 8px;border-bottom:2px solid #1e3a5f;padding-bottom:5px;">${line.replace(/^## /, '')}</h2>`;
+      } else if (line.startsWith('# ')) {
+        flushList(); flushTable();
+        bodyHtml += `<h1 style="color:#1e3a5f;font-size:18px;font-weight:bold;margin:20px 0 10px;border-bottom:3px solid #3b82f6;padding-bottom:6px;">${line.replace(/^# /, '')}</h1>`;
+      } else if (line.match(/^[\*\-] /)) {
+        flushTable();
+        if (!inList) { bodyHtml += '<ul style="margin:8px 0;padding-left:20px;">'; inList = true; }
+        const itemText = line.replace(/^[\*\-] /, '').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        const itemStyle = isThreatLine
+          ? 'padding:4px 8px;margin-bottom:4px;background:#fee2e2;border-left:3px solid #dc2626;border-radius:3px;'
+          : 'padding:3px 0;margin-bottom:2px;';
+        bodyHtml += `<li style="${itemStyle}">${itemText}</li>`;
+      } else if (line.trim()) {
+        flushList(); flushTable();
+        const formatted = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\*(.*?)\*/g, '<em>$1</em>');
+        if (isThreatLine) {
+          bodyHtml += `<div style="background:#fff0f0;border-left:4px solid #dc2626;padding:10px 14px;margin:8px 0;border-radius:4px;font-size:13px;color:#111;">${formatted}</div>`;
+        } else if (line.toLowerCase().includes('executive summary') || line.toLowerCase().includes('summary')) {
+          bodyHtml += `<div style="background:#eff6ff;border-left:4px solid #3b82f6;padding:10px 14px;margin:10px 0;border-radius:4px;font-size:13px;color:#1e3a5f;font-weight:500;">${formatted}</div>`;
+        } else {
+          bodyHtml += `<p style="margin:6px 0;font-size:13px;color:#222;line-height:1.6;">${formatted}</p>`;
+        }
+      }
+    }
+    flushList(); flushTable();
+
+    // ── Step 3: Assemble Final Enterprise HTML Document ──
+    const printElement = document.createElement('div');
+    printElement.style.backgroundColor = '#ffffff';
+    printElement.style.color = '#111111';
+    printElement.style.fontFamily = 'Arial, Inter, sans-serif';
+    printElement.style.width = '100%';
+
+    printElement.innerHTML = `
+      <!-- Header Banner -->
+      <div style="background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 60%,#1d4ed8 100%);padding:28px 32px;border-radius:4px 4px 0 0;margin-bottom:0;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+          <div>
+            <div style="font-size:9px;letter-spacing:0.25em;color:#93c5fd;text-transform:uppercase;margin-bottom:6px;font-weight:bold;">🛡️ NETGUARD BHARAT</div>
+            <div style="font-size:20px;font-weight:bold;color:#ffffff;letter-spacing:0.04em;line-height:1.2;">THREAT INTELLIGENCE REPORT</div>
+            <div style="font-size:11px;color:#bfdbfe;margin-top:6px;">AI Copilot Generated Analysis</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:10px;color:#93c5fd;margin-bottom:2px;">DATE GENERATED</div>
+            <div style="font-size:12px;color:#ffffff;font-weight:bold;">${reportDate}</div>
+            <div style="margin-top:8px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:3px 10px;display:inline-block;">
+              <span style="font-size:10px;color:#86efac;font-weight:bold;">● CLASSIFIED</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Status Bar -->
+      <div style="background:#1e3a5f;padding:7px 32px;display:flex;gap:24px;margin-bottom:20px;">
+        <span style="color:#93c5fd;font-size:10px;font-weight:bold;letter-spacing:0.1em;">ENGINE: CLOUD AI (GEMINI)</span>
+        <span style="color:#6b7280;font-size:10px;">|</span>
+        <span style="color:#93c5fd;font-size:10px;font-weight:bold;letter-spacing:0.1em;">SCOPE: LAST 5 MINUTES TELEMETRY</span>
+        <span style="color:#6b7280;font-size:10px;">|</span>
+        <span style="color:#93c5fd;font-size:10px;font-weight:bold;letter-spacing:0.1em;">PRIVACY: IP ADDRESSES REDACTED</span>
+      </div>
+      <!-- Report Body -->
+      <div style="padding:0 24px 24px;">
+        ${bodyHtml}
+      </div>
+      <!-- Footer -->
+      <div style="border-top:1px solid #e5e7eb;padding:12px 24px;margin-top:10px;display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:10px;color:#9ca3af;">NetGuard Bharat © 2026 — Developed by Prasad Prashant Dabhekar</span>
+        <span style="font-size:10px;color:#9ca3af;">CONFIDENTIAL — RESTRICTED DISTRIBUTION</span>
+      </div>
+    `;
+
+    // ── Step 4: Export Configuration ──
+    const opt = {
+      margin: [0.3, 0.3, 0.3, 0.3],
+      filename: `NetGuard_Threat_Report_${Date.now()}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, backgroundColor: '#ffffff', useCORS: true },
+      jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+    };
+
+    html2pdf().set(opt).from(printElement).save();
+  };
 
   const PROCESS_LIST = ['chrome.exe', 'msedge.exe', 'svchost.exe', 'Discord.exe', 'Spotify.exe', 'Unknown.exe'];
   const COUNTRY_LIST = ['United States', 'India', 'China', 'Russia', 'United Kingdom', 'Germany', 'Singapore'];
@@ -1008,7 +1193,7 @@ function App() {
               </div>
 
               {/* Message Window */}
-              <div id="copilot-report-container" style={{
+              <div id="copilot-report-container" ref={reportRef} style={{
                 flex: 1,
                 overflowY: 'auto',
                 padding: '10px',
@@ -1087,7 +1272,7 @@ function App() {
                 <div style={{ padding: '4px 0 8px 0' }}>
                   <button
                     className="download-log-btn"
-                    onClick={exportCopilotReportPDF}
+                    onClick={handleDownloadPDF}
                     style={{ width: '100%', background: 'rgba(168,85,247,0.15)', borderColor: 'rgba(168,85,247,0.3)', color: '#d8b4fe' }}
                   >
                     ⬇ Download Threat Report (PDF)

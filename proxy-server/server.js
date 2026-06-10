@@ -170,22 +170,29 @@ app.post('/api/copilot', async (req, res) => {
   try {
     // TODO: Update the Python network_baseline/enterprise_tap script later to include a payload_size_bytes metric so the AI can analyze data exfiltration volume.
     const { userQuery, aiEngine = 'local' } = req.body || {};
-    
-    // Action 2 & 3: Database Context Fetch and CSV Compression
-    const fetchRecentContext = () => {
-      return new Promise((resolve, reject) => {
-        db.all(
-          `SELECT timestamp, process, target_ip, severity, threat FROM logs WHERE timestamp >= datetime('now', '-5 minutes')`,
-          [],
-          (err, rows) => {
-            if (err) return reject(err);
-            resolve(rows);
-          }
-        );
-      });
-    };
+    const message = userQuery || '';
 
-    const recentLogs = await fetchRecentContext();
+    // Action 3: Add an Intent Gateway
+    const isGreeting = message.length < 30 || /^(hi|hello|how are you|bro)\b/i.test(message.trim());
+    let currentLogs = "No telemetry requested for casual conversation.";
+    let recentLogs = [];
+
+    // Action 1: Block log fetching if the user's message is a casual greeting
+    if (!isGreeting) {
+      const fetchRecentContext = () => {
+        return new Promise((resolve, reject) => {
+          db.all(
+            `SELECT timestamp, process, target_ip, severity, threat FROM logs WHERE timestamp >= datetime('now', '-5 minutes')`,
+            [],
+            (err, rows) => {
+              if (err) return reject(err);
+              resolve(rows);
+            }
+          );
+        });
+      };
+      recentLogs = await fetchRecentContext();
+    }
     
     function sanitizeLogs(logsArray) {
       return logsArray.map(log => {
@@ -198,56 +205,48 @@ app.post('/api/copilot', async (req, res) => {
     }
 
     const buildPrompt = (logsToUse, isCloud) => {
-      // Compress logs into dense CSV format to save token context window
-      const logsContext = ['Timestamp,Process,Target_IP,Severity,Threat'].concat(
-        logsToUse.map(log => `${log.timestamp},${log.process || 'Unknown'},${isCloud ? '[REDACTED_IP]' : (log.target_ip || 'Unknown')},${log.severity || 'Unknown'},${log.threat || 'Unknown'}`)
-      ).join('\n');
+      if (!isGreeting && logsToUse.length > 0) {
+        // Only send THREATs, and cap it at the 40 most recent events to prevent LLM latency
+        const criticalLogs = logsToUse.filter(log => log.severity === 'THREAT' || log.severity === 'HIGH').slice(-40);
+        currentLogs = JSON.stringify(criticalLogs);
+      }
 
-      let prompt = `You are NetGuard Copilot, an elite Tier-3 Cybersecurity Analyst AI. Your tone is professional, analytical, and highly competent. If the user greets you casually, acknowledge it politely but immediately pivot to offering network security insights, threat analysis, or PCAP reviews based on the current dashboard telemetry.
+      // Action 2: Enforce Strict Payload Isolation
+      let systemInstruction = "You are a conversational security assistant. Respond to the USER_INPUT. Only analyze the TELEMETRY_DATA if explicitly ordered to generate a threat report.";
+      
+      if (!isGreeting) {
+        systemInstruction += `\n\nCRITICAL MERMAID GRAPH RULES:
+When creating the NETWORK ACTIVITY VISUALIZATION, you must output a 100% syntactically valid Mermaid.js graph. Follow these rules strictly:
 
-CRITICAL CAPABILITY AWARENESS: You are integrated into the NetGuard Bharat Enterprise UI. The frontend has a native Markdown-to-PDF conversion engine. If the user asks you to 'generate a PDF', 'export a report', or 'make a document', DO NOT say that you cannot create files. Instead, you MUST immediately write a highly detailed, professional markdown report analyzing the requested logs, and conclude your message by saying: 'I have compiled the requested intelligence. You may download the PDF report using the export button below.'
+NEVER use dollar signs ($), curly braces ({}), or math notations inside node names or connection labels.
 
-CRITICAL DIRECTIVES:
-1. Only analyze the network logs and discuss telemetry or threats if the user explicitly asks a question about the system, logs, anomalies, network activity, or security threats.
-2. Analyze the following telemetry data (Last 5 Minutes). Do not mention the CSV format. Output your intelligence report directly. If the user asks for data that is not present in the provided JSON schema (such as payload sizes), explicitly state that the telemetry tap is not currently capturing that specific metric, but analyze the remaining available metrics (like IPs, Ports, and Severity).
+Connection labels MUST use the pipe notation syntax exclusively: NodeID -->|LABEL| DestinationID (e.g., App1 -->|THREAT| Net). Do NOT use: App1 "THREAT" --> Net.
 
-REPORTING PROTOCOL: When asked to generate a report or analyze a time window, you MUST use rich Markdown formatting to create a visually striking document. You must adhere to the following structure:
-Use an H2 (##) for 'Executive Summary' and provide a high-level impact assessment.
-Use a Markdown Table (|---|---|) to display 'Event Statistics' (e.g., Total Logs, Severity Breakdown, Top Targeted Countries). Do not use plain text lists for stats.
-Use an H2 (##) for 'Threat Hypothesis' where you explain why this specific traffic pattern is dangerous (e.g., explaining why a 1440-byte MTU payload indicates data exfiltration). Use blockquotes (>) for critical warnings.
-Bold (**text**) all IP addresses, process names, and severity levels.
-When visualizing network topologies, you MUST use Mermaid.js. You are strictly forbidden from outputting raw Mermaid text. You MUST wrap the entire graph in \`\`\`mermaid backticks.
-When adding text labels to arrows, you MUST wrap the label strictly in pipe characters |.
-When generating Mermaid.js charts, you must use strict, error-free syntax. Only use 'graph TD' or 'pie' chart types. Do not use special characters, unescaped brackets, or complex subgraphs. Wrap the syntax cleanly in a standard markdown code block labeled 'mermaid'. Keep node names simple and alphanumeric.
+Keep entire node declarations on a single continuous line. Never allow a node definition or label to break into a new line.
 
-CORRECT FORMAT Example:
+All node display text containing special characters or extensions like '.exe' must be wrapped in clean double quotes inside brackets: NodeID["process.exe"].
+
+EXACT TEMPLATE EXAMPLE TO FOLLOW:
 \`\`\`mermaid
-graph TD;
+graph TD
+Net["Internal Network"]
+Threat1["Antigravity IDE.exe"]
+SafeP1["chrome.exe"]
 
-A[Attacker] -->|Injects SQL| B(Web App);
-
-B -->|Queries| C[(Database)];
-\`\`\`
-
-INCORRECT FORMAT (DO NOT USE): A --> Injects SQL B
-Conclude with the exact phrase: 'I have compiled the requested intelligence. You may download the PDF report using the export button below.'`;
-
-      if (isCloud) {
-        prompt += `\n5. Security Notice: Specific IP addresses have been deliberately scrubbed from these logs and replaced with placeholders to enforce Zero-Trust privacy protocols. Do not flag missing IPs as an error. Focus your analysis purely on application behavior, geographic routing, and severity flags.`;
+Threat1 -->|THREAT| Net
+SafeP1 -->|SAFE| Net
+\`\`\``;
       }
 
-      prompt += `\n\nRecent Network Logs:\n${logsContext || 'No logs recorded yet.'}`;
-      if (userQuery) {
-        prompt += `\n\nUser Query: ${userQuery}`;
-      }
-      return prompt;
+      const finalPrompt = `${systemInstruction}\n\nTELEMETRY_DATA:\n${currentLogs}\n\nUSER_INPUT:\n${message}`;
+      return finalPrompt;
     };
 
     if (aiEngine === 'cloud') {
       console.log("[☁️ CLOUD ENGINE] Routing request to Gemini (Sanitized Data)...");
       const scrubbedLogs = sanitizeLogs(recentLogs);
       const cloudPrompt = buildPrompt(scrubbedLogs, true);
-      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
       console.log("[☁️ CLOUD ENGINE] Waiting for Gemini API to generate content...");
       const result = await model.generateContent(cloudPrompt);
       const response = await result.response;
@@ -277,12 +276,18 @@ Conclude with the exact phrase: 'I have compiled the requested intelligence. You
       return res.status(200).json({ reply: data.response });
     }
   } catch (error) {
-    console.error("AI FETCH ERROR:", error.message || error);
-    console.error('Error in AI Copilot endpoint:', error);
-    res.status(500).json({ 
-      reply: 'Sorry, I encountered an error. Please ensure the requested AI engine is active and configured correctly.' 
-    });
-  }
+      console.error("AI FETCH ERROR:", error.message || error);
+      console.error('Error in AI Copilot endpoint:', error);
+      
+      let replyMessage = '🚨 Connection to AI engine failed. Please ensure the proxy server is active.';
+      if (error.status === 429) {
+        replyMessage = '🚨 Google Gemini API Quota Exceeded! Your free-tier limits have been reached. Please toggle to "EDGE AI (Local)" in the top right to continue using the Copilot.';
+      } else if (error.status === 503) {
+        replyMessage = '🚨 Google Gemini API is experiencing high demand. Please try again or switch to "EDGE AI (Local)".';
+      }
+
+      res.status(500).json({ reply: replyMessage });
+    }
 });
 
 server.listen(SOCKET_PORT, () => {
