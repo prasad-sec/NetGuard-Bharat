@@ -6,6 +6,9 @@ Developed by: Prasad Prashant Dabhekar
 ### Purpose
 The purpose of this document is to outline the software requirements for NetGuard Bharat, a real-time network threat detection and monitoring system. This document serves as the official technical specification for NetGuard Bharat, describing its architecture, system requirements, design, and planned future enhancements.
 
+### Intended Audience
+This document is intended for software developers, system architects, cybersecurity researchers, and project stakeholders. It provides a formal, comprehensive technical foundation for understanding the architecture, features, and operational workflows of the NetGuard Bharat system. Readers are expected to have a basic understanding of network protocols, system administration, and web technologies.
+
 ### Scope
 NetGuard Bharat focuses on monitoring network traffic, using AI-assisted threat analysis, and providing a 3D visualization dashboard. It captures telemetry, analyzes payloads, geofences connections, and presents the data through a web interface to help users identify potential threats.
 
@@ -23,6 +26,9 @@ NetGuard Bharat focuses on monitoring network traffic, using AI-assisted threat 
 
 ### Overview
 The system captures raw network packets using a Python tap, processes the telemetry, and forwards it to an AI engine (using Ollama and Gemini) for basic pattern matching and payload summaries. A Node.js backend handles socket communication, delivering real-time updates to a React frontend that uses Three.js for geospatial mapping.
+
+### References
+- The initial concept of NetGuard Bharat was inspired by a cybersecurity-related hackathon problem statement. The system architecture, implementation, and feature set were independently designed and developed by the author.
 
 ---
 
@@ -166,5 +172,3 @@ The architecture is designed to accommodate expansions in the future:
 ## 11. Conclusion
 
 NetGuard Bharat is designed as a real-time network monitoring and threat visualization system focused on outbound traffic analysis. By combining basic packet analysis with heuristic machine learning and 3D visualization, it helps users identify and understand potential threats. The modular architecture provides a solid foundation for adding new analysis techniques as the project evolves.
-
-
