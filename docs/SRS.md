@@ -4,7 +4,7 @@ Developed by: Prasad Prashant Dabhekar
 ## 1. Introduction
 
 ### Purpose
-The purpose of this document is to outline the software requirements for NetGuard Bharat, a real-time network threat detection and monitoring system. This document serves as a guide for developers and project members to understand the architecture, features, and future goals of the project.
+The purpose of this document is to outline the software requirements for NetGuard Bharat, a real-time network threat detection and monitoring system. This document serves as the official technical specification for NetGuard Bharat, describing its architecture, system requirements, design, and planned future enhancements.
 
 ### Scope
 NetGuard Bharat focuses on monitoring network traffic, using AI-assisted threat analysis, and providing a 3D visualization dashboard. It captures telemetry, analyzes payloads, geofences connections, and presents the data through a web interface to help users identify potential threats.
